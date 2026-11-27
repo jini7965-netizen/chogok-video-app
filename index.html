@@ -221,10 +221,33 @@ canvas#preview.dragging{cursor:grabbing}
   border:1px solid #2f7f6d; background:
     repeating-linear-gradient(90deg,rgba(95,224,192,.16) 0 3px,transparent 3px 7px),
     linear-gradient(180deg,rgba(28,92,80,.75),rgba(18,62,54,.8));
-  display:flex; align-items:center; gap:5px; padding:0 7px; font-size:10px; color:#d6fff5;
+  display:flex; align-items:center; gap:5px; padding:0 18px 0 7px; font-size:10px; color:#d6fff5;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
 .audio-block.sel{box-shadow:0 0 0 2px rgba(95,224,192,.45); border-color:#5fe0c0}
 .audio-block span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* 음악 블록 오른쪽 🗑 = 꾹 누르면 삭제된다는 표시 */
+.audio-block .au-del{position:absolute; right:4px; top:50%; transform:translateY(-50%); font-size:9px; font-weight:400; opacity:.55; pointer-events:none}
+.audio-block.sel .au-del{opacity:.9}
+/* 꾹 누르는 동안의 진행 표시(450ms) — 손가락 아래 블록 위에 겹쳐 그린다 */
+.lp-ring{
+  position:fixed; z-index:90; pointer-events:none; border-radius:8px; overflow:hidden;
+  background:rgba(255,77,109,.18);
+  box-shadow:0 0 0 2px rgba(255,90,120,.95), 0 0 18px rgba(255,90,120,.55);
+  animation:lppulse .45s ease-in-out infinite alternate;
+}
+.lp-ring:before{
+  content:""; position:absolute; left:0; top:0; bottom:0; width:0;
+  background:linear-gradient(90deg,rgba(255,77,109,.6),rgba(255,150,168,.85));
+  animation:lpfill .45s linear forwards;
+}
+.lp-ring:after{
+  content:"🗑 삭제"; position:absolute; inset:0; display:grid; place-items:center;
+  font-size:10px; font-weight:800; letter-spacing:.3px; color:#fff;
+  text-shadow:0 1px 3px rgba(0,0,0,.9);
+}
+@keyframes lpfill{from{width:0}to{width:100%}}
+@keyframes lppulse{from{opacity:.82}to{opacity:1}}
 .playhead{position:absolute; top:0; bottom:0; width:2px; background:linear-gradient(180deg,#ff7a90,#ff4d6d); pointer-events:none; z-index:6; box-shadow:0 0 10px rgba(255,77,109,.6)}
 .playhead i{position:absolute; top:-2px; left:-7px; width:16px; height:13px; background:#ff4d6d; border-radius:3px 3px 6px 6px; box-shadow:0 2px 6px rgba(0,0,0,.5); pointer-events:auto; touch-action:none; cursor:ew-resize}
 /* 빨간 바를 손가락으로 잡기 쉽게: 세로선 둘레에 폭 32px 투명 히트박스 (pointer-events 는 이 히트박스만 auto) */
@@ -322,6 +345,24 @@ body[data-panel-tab=image] .tools-panel{height:170px}
 .music-row .nm span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .music-row .x{border:0; background:transparent; color:#7c8698; font-size:12px; padding:0 2px}
 .music-row .x:hover{color:var(--rose)}
+/* 곡별 삭제 버튼 — 빨간 라벨 버튼으로 키워 한눈에 보이게 */
+.music-row .music-del{
+  flex:0 0 auto; display:inline-flex; align-items:center; gap:4px;
+  border:1px solid #a2384e; background:linear-gradient(180deg,#5a1f2c,#3d1420); color:#ffd3da;
+  border-radius:8px; padding:5px 10px; font-size:11px; font-weight:800; letter-spacing:.2px;
+  white-space:nowrap; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.35);
+}
+.music-row .music-del:hover{background:linear-gradient(180deg,#7a2939,#4d1924); color:#fff; border-color:#e0566f}
+.music-row .music-del:active{transform:scale(.96)}
+.music-row .idx{
+  flex:0 0 auto; min-width:16px; height:16px; border-radius:5px; display:grid; place-items:center;
+  font-size:9px; font-weight:800; color:#0f1a18; background:var(--mint);
+}
+/* 원본 음소거·트랙 음소거 체크는 눈에 띄는 알약형으로 */
+label.chip.chk{padding:4px 8px; font-weight:700}
+label.chip.chk input{margin:0 1px 0 0; width:12px; height:12px}
+label.chip.chk.on{border-color:#ffb84d; background:#3a2a10; color:#ffe7bd; box-shadow:0 0 0 1px rgba(255,184,77,.35)}
+label.chip.chk.mute-track.on{border-color:#ff8fa3; background:#3a1720; color:#ffd7de; box-shadow:0 0 0 1px rgba(255,143,163,.35)}
 .meter{height:3px; width:44px; border-radius:2px; background:linear-gradient(90deg,var(--mint),var(--accent)); opacity:.65}
 /* ---------- 음악 탭: BGM 프리셋 카드 ---------- */
 .bgm-strip{display:flex; gap:7px; overflow-x:auto; padding:2px 0 4px; max-width:100%; scrollbar-width:none}
@@ -2140,7 +2181,7 @@ function splitAtPlayhead() {
   toast('재생헤드에서 클립을 분할했어요 ✂', 'ok');
   return right;
 }
-function deleteSelected() {
+function deleteSelected(msg) {
   const s = state.selected;
   if (!s) { toast('삭제할 항목을 먼저 선택해 주세요.', 'warn'); return; }
   pushHistory();
@@ -2159,7 +2200,7 @@ function deleteSelected() {
   layout();
   state.time = clamp(state.time, 0, totalDuration());
   renderAll();
-  toast('삭제했어요');
+  toast(msg || '삭제했어요');
 }
 function moveSelectedClip(dir) {
   const c = selectedClip();
@@ -2282,9 +2323,9 @@ function selectOverlay(id) {
   tab = ov ? (ov.kind === 'text' ? 'text' : 'image') : 'edit';
   renderRight(); renderTimeline(); drawNow();
 }
-function selectAudio(id) {
+function selectAudio(id, keepTab) {
   state.selected = { type: 'audio', id };
-  tab = 'music';
+  if (!keepTab) tab = 'music';   // 타임라인에서 꼭 누르는 중에는 탭을 바꾸지 않는다(음악 탭이 타임라인을 접어 버림)
   renderRight(); renderTimeline();
 }
 
@@ -2361,9 +2402,9 @@ function renderTimeline() {
     const left = a.start * zoom;
     const w = Math.max(20, a.duration * zoom);
     const sel = state.selected && state.selected.type === 'audio' && state.selected.id === a.id;
-    return `<div class="audio-block${sel ? ' sel' : ''}" data-id="${a.id}" title="${esc(a.name)} · ${fmtTime(a.duration)}"
+    return `<div class="audio-block${sel ? ' sel' : ''}" data-id="${a.id}" title="${esc(a.name)} · ${fmtTime(a.duration)} — 꼭 누르면 삭제"
         style="left:${left.toFixed(1)}px;width:${Math.max(18, w - 2).toFixed(1)}px">
-        <span class="ico">♪</span><span>${esc(a.name || '음악')}</span>
+        <span class="ico">♪</span><span>${esc(a.name || '음악')}</span><b class="au-del" aria-hidden="true">🗑</b>
       </div>`;
   }).join('') + (state.audios.length ? '' : `<div class="track-empty">♪ 음악 추가로 배경음악을 넣어 보세요</div>`);
 
@@ -2993,38 +3034,45 @@ function bgmCardHTML(p) {
 
 /* ---------------- panel: 음악 ---------------- */
 function musicPanelHTML() {
-  const rows = state.audios.map(a => `
+  const rows = state.audios.map((a, i) => `
     <div class="music-row${state.selected && state.selected.type === 'audio' && state.selected.id === a.id ? ' sel' : ''}">
+      <span class="idx">${i + 1}</span>
       <span class="nm">♪ <span>${esc(a.name || '음악')}</span></span>
+      <button class="music-del" data-act="delAudio" data-id="${a.id}" title="이 음악 삭제">🗑 삭제</button>
       <span class="meter"></span>
       ${ctl('볼륨', rng('audio', 'volume', 0, 1, 0.02, a.volume, a.id) + valSpan(pct(a.volume)))}
       ${ctl('시작', num('audio', 'start', 0, 3600, 0.1, Math.round(a.start * 10) / 10, a.id) + valSpan('초'))}
       ${ctl('트림', num('audio', 'in', 0, 3600, 0.1, Math.round(a.in * 10) / 10, a.id) + valSpan('초'))}
       ${ctl('길이', num('audio', 'duration', 0.2, 3600, 0.1, Math.round(a.duration * 10) / 10, a.id) + valSpan('초'))}
-      <label class="chip" style="cursor:pointer"><input type="checkbox" data-audio="muted" data-id="${a.id}" ${a.muted ? 'checked' : ''} style="accent-color:var(--accent)"> 음소거</label>
-      <button class="x" data-act="delAudio" data-id="${a.id}" title="삭제">✕</button>
+      <label class="chip chk mute-track${a.muted ? ' on' : ''}" style="cursor:pointer"><input type="checkbox" data-audio="muted" data-id="${a.id}" ${a.muted ? 'checked' : ''} style="accent-color:var(--accent)"> 음소거</label>
     </div>`).join('');
   const lib = Array.from(assets.values()).filter(a => a.kind === 'audio' && !a.sticker);
   const libChips = lib.length ? `<div class="chip-strip">${lib.map(assetChip).join('')}</div>` : '';
+  const multi = state.audios.length > 1;
+  /* 위에서부터: 지금 깔린 음악(곡별 🗑 삭제) → 음악 넣기 → 전체 설정 → BGM 보관함.
+     아이폰에서 탭을 열자마자 각 곡의 🗑 삭제가 보이도록 곡 줄을 맨 위에 둔다. */
   return `
-    <div class="tool-row">
-      <span class="tool-label">BGM</span>
-      <div class="bgm-strip">${BGM_PRESETS.map(bgmCardHTML).join('')}</div>
-    </div>
-    <div class="tool-row"><span class="hint-inline">▶로 미리 듣고 ＋로 음악 트랙에 넣으세요. 모두 이 앱에서 직접 만든 저작권 걱정 없는 음악이에요 (생일·크리스마스·새해는 퍼블릭 도메인 전통 선율).</span></div>
+    ${rows || `<div class="tool-row"><span class="hint-inline">아직 음악이 없어요. 음악 파일을 올려 배경음악을 깔아 보세요.</span></div>`}
     <div class="tool-row">
       <button class="pill primary" data-act="pickAudio">＋ 음악 파일</button>
       <span class="hint-inline">MP3 · M4A · WAV</span>
       <button class="pill" data-act="extractVideoAudio" title="영상 파일을 골라 소리만 뽑아 음악 트랙에 넣습니다">🎬 영상에서 음악 추출</button>
       ${libChips}
       <div class="spacer" style="flex:1 1 auto"></div>
+    </div>
+    <div class="tool-row">
       <span class="tool-label" style="min-width:auto">전체</span>
       ${ctl('원본 영상', rng('global', 'video', 0, 1, 0.02, state.globalVideoVolume) + valSpan(pct(state.globalVideoVolume)))}
-      <label class="chip" style="cursor:pointer"><input type="checkbox" data-global="videoMute" ${state.globalVideoMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 원본 음소거</label>
+      <label class="chip chk mute-orig${state.globalVideoMuted ? ' on' : ''}" style="cursor:pointer" title="영상 원래 소리를 꺼서 배경음악만 들리게 합니다"><input type="checkbox" data-global="videoMute" ${state.globalVideoMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 🔇 원본 음소거</label>
       ${ctl('배경음악', rng('global', 'music', 0, 1, 0.02, state.globalMusicVolume) + valSpan(pct(state.globalMusicVolume)))}
-      <label class="chip" style="cursor:pointer"><input type="checkbox" data-global="musicMute" ${state.globalMusicMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 음악 음소거</label>
+      <label class="chip chk${state.globalMusicMuted ? ' on' : ''}" style="cursor:pointer"><input type="checkbox" data-global="musicMute" ${state.globalMusicMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 음악 음소거</label>
     </div>
-    ${rows || `<div class="tool-row"><span class="hint-inline">아직 음악이 없어요. 음악 파일을 올려 배경음악을 깔아 보세요.</span></div>`}`;
+    ${multi ? `<div class="tool-row"><span class="hint-inline">🎵 지금 ${state.audios.length}곡이 겹쳐 있어요 — 하나만 남기려면 그 줄의 <b style="color:#ffb8c2">🗑 삭제</b>, 타임라인 음악 블록은 <b style="color:#ffb8c2">꾹 누르면</b> 바로 지워져요.</span></div>` : ''}
+    <div class="tool-row">
+      <span class="tool-label">BGM</span>
+      <div class="bgm-strip">${BGM_PRESETS.map(bgmCardHTML).join('')}</div>
+    </div>
+    <div class="tool-row"><span class="hint-inline">▶로 미리 듣고 ＋로 음악 트랙에 넣으세요. 모두 이 앱에서 직접 만든 저작권 걱정 없는 음악이에요 (생일·크리스마스·새해는 퍼블릭 도메인 전통 선율).</span></div>`;
 }
 
 /* ---------------- panel: 비율 ---------------- */
@@ -3181,7 +3229,11 @@ function onAudioInput(t) {
   const a = id ? audioById(id) : selectedAudio();
   if (!a) return;
   const p = t.dataset.audio;
-  if (p === 'muted') { a.muted = t.checked; applyAudioItem(a); return; }
+  if (p === 'muted') {
+    a.muted = t.checked; applyAudioItem(a);
+    const lb = t.closest('label.chk'); if (lb) lb.classList.toggle('on', !!t.checked);
+    return;
+  }
   const v = parseFloat(t.value);
   if (isNaN(v)) return;
   if (p === 'volume') a.volume = clamp(v, 0, 1);
@@ -3199,6 +3251,7 @@ function onGlobalInput(t) {
   if (p === 'music') state.globalMusicVolume = clamp(parseFloat(t.value), 0, 1);
   if (p === 'videoMute') state.globalVideoMuted = t.checked;
   if (p === 'musicMute') state.globalMusicMuted = t.checked;
+  if (p === 'videoMute' || p === 'musicMute') { const lb = t.closest('label.chk'); if (lb) lb.classList.toggle('on', !!t.checked); }
   const valEl = t.parentElement.querySelector('.val');
   if (valEl && (p === 'video' || p === 'music')) valEl.textContent = pct(p === 'video' ? state.globalVideoVolume : state.globalMusicVolume);
   applyAllClipAudio(); applyAllAudio();
@@ -3330,7 +3383,7 @@ toolsPanel.addEventListener('click', e => {
   else if (act === 'clipRight') moveSelectedClip(1);
   else if (act === 'dupOv') { const ov = selectedOverlay(); if (ov) duplicateOverlay(ov); }
   else if (act === 'layerUp' || act === 'layerDown') { const ov = selectedOverlay(); if (ov) moveLayer(ov, act === 'layerUp' ? 1 : -1); }
-  else if (act === 'delAudio') { state.selected = { type: 'audio', id: b.dataset.id }; deleteSelected(); }
+  else if (act === 'delAudio') { state.selected = { type: 'audio', id: b.dataset.id }; deleteSelected('🎵 음악을 삭제했어요 (실행 취소로 되돌릴 수 있어요)'); }
   else if (act === 'export') startExport();
   else if (act === 'sample') loadSample();
 });
@@ -3398,6 +3451,48 @@ window.addEventListener('resize', () => { lastLayoutTab = null; applyTabLayout(t
 
 /* ---------------- timeline interactions ---------------- */
 let tlDrag = null;
+
+/* ---------------- 음악 블록 꼭 누르면 삭제 (롱프레스) ----------------
+   - 타임라인 음악 블록을 450ms 이상 가만히 누르면 그 음악을 지운다(실행 취소 가능).
+   - 손가락이 8px 이상 움직이면 스크롤·드래그로 보고 취소한다 → 이동·트림과 충돌하지 않는다. */
+const LP_MS = 450, LP_TOL = 8;
+let lpPress = null;
+function lpCancel() {
+  if (!lpPress) return;
+  clearTimeout(lpPress.timer);
+  if (lpPress.ring) { lpPress.ring.remove(); lpPress.ring = null; }
+  lpPress = null;
+}
+function lpStart(id, rect, x, y) {
+  lpCancel();
+  const ring = document.createElement('div');
+  ring.className = 'lp-ring';
+  ring.style.left = rect.left + 'px';
+  ring.style.top = rect.top + 'px';
+  ring.style.width = rect.width + 'px';
+  ring.style.height = rect.height + 'px';
+  document.body.appendChild(ring);
+  const st = { id, ring, x, y, timer: 0 };
+  st.timer = setTimeout(() => lpFire(st), LP_MS);
+  lpPress = st;
+}
+function lpFire(st) {
+  clearTimeout(st.timer);
+  if (st.ring) { st.ring.remove(); st.ring = null; }
+  if (lpPress === st) lpPress = null;
+  const a = audioById(st.id);
+  if (!a) return;
+  tlDrag = null;                 // 진행 중이던 드래그·트림 기록은 버린다(중복 히스토리 방지)
+  pushHistory();                 // 실행 취소로 되돌릴 수 있게
+  if (a._el) { try { a._el.pause(); } catch (e) { } a._el.remove(); a._el = null; }
+  state.audios = state.audios.filter(x => x.id !== st.id);
+  if (state.selected && state.selected.type === 'audio' && state.selected.id === st.id) state.selected = null;
+  layout();
+  state.time = clamp(state.time, 0, totalDuration());
+  renderAll();
+  try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) { }
+  toast('🎵 음악을 삭제했어요 (실행 취소로 되돌릴 수 있어요)', 'ok');
+}
 function showTlTip(e, c) {
   const tip = $('#tlTip');
   if (!tip) return;
@@ -3515,8 +3610,10 @@ tlContent.addEventListener('pointerdown', e => {
   } else if (auEl) {
     const a = audioById(auEl.dataset.id);
     if (!a) return;
-    selectAudio(a.id);
+    const auRect = auEl.getBoundingClientRect();
+    selectAudio(a.id, true);   // 고르기만 — 탭 전환은 톡 치고 뗄 때
     tlDrag = { kind: 'audio', a, x, start: a.start, moved: false, snap: snapshot() };
+    lpStart(a.id, auRect, e.clientX, e.clientY);   // 450ms 꼭 누르면 삭제
     e.preventDefault();
   } else if (clEl) {
     const c = clipById(clEl.dataset.id);
@@ -3527,6 +3624,7 @@ tlContent.addEventListener('pointerdown', e => {
   }
 });
 window.addEventListener('pointermove', e => {
+  if (lpPress && (Math.abs(e.clientX - lpPress.x) > LP_TOL || Math.abs(e.clientY - lpPress.y) > LP_TOL)) lpCancel();
   if (!tlDrag) return;
   if (tlDrag.kind === 'scrub') {
     tlDrag.moved = true;
@@ -3574,8 +3672,10 @@ window.addEventListener('pointermove', e => {
   }
 });
 window.addEventListener('pointerup', e => {
+  lpCancel();
   if (!tlDrag) return;
   hideTlTip();
+  const dragKind = tlDrag.kind, dragMoved = tlDrag.moved;
   if (tlDrag.kind === 'scrub') {
     phStopScrub();
     if (!tlDrag.moved) phTapThrough(e.clientX, e.clientY);
@@ -3588,8 +3688,10 @@ window.addEventListener('pointerup', e => {
   }
   tlDrag = null;
   renderTimeline();
+  // 음악 블록을 톡 치고 뗐을 때만 음악 탭(볼륨·길이 조절)으로 넘어간다
+  if (dragKind === 'audio' && !dragMoved && audioById(state.selected && state.selected.id)) { tab = 'music'; renderRight(); }
 });
-window.addEventListener('pointercancel', () => { if (tlDrag && tlDrag.kind === 'scrub') { phStopScrub(); tlDrag = null; } });
+window.addEventListener('pointercancel', () => { lpCancel(); if (tlDrag && tlDrag.kind === 'scrub') { phStopScrub(); tlDrag = null; } });
 
 /* ---------------- preview canvas interactions ---------------- */
 let pointerOp = null;
