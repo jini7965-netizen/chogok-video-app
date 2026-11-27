@@ -235,6 +235,10 @@ canvas#preview.dragging{cursor:grabbing}
 .tools-panel::-webkit-scrollbar{width:8px}
 .tools-panel::-webkit-scrollbar-thumb{background:#2a3244; border-radius:9px}
 .tools-panel.collapsed{height:0; padding-top:0; padding-bottom:0; overflow:hidden}
+/* 자막·음악·이미지 탭은 도구가 많아 데스크톱에서도 높이를 조금 넓힌다 (모바일 높이는 아래 미디어쿼리에서 다시 정함) */
+body[data-panel-tab=text] .tools-panel{height:200px}
+body[data-panel-tab=music] .tools-panel,
+body[data-panel-tab=image] .tools-panel{height:170px}
 .tool-row{display:flex; align-items:center; gap:7px; margin-bottom:7px; flex-wrap:wrap; min-height:26px}
 .tool-row:last-child{margin-bottom:0}
 .tool-label{font-size:9.5px; font-weight:700; color:var(--muted); letter-spacing:.5px; min-width:40px; flex:0 0 auto; text-transform:uppercase}
@@ -3198,19 +3202,14 @@ function setTlCollapsed(v) {
   }
 }
 /* 탭이 바뀔 때만 자동 적용 — 사용자가 [펼치기]를 누른 상태를 덮어쓰지 않는다 */
-function applyTabLayout() {
-  if (lastLayoutTab === tab) return;
+function applyTabLayout(force) {
+  if (!force && lastLayoutTab === tab) return;
   lastLayoutTab = tab;
-  if (!isNarrowScreen()) {
-    setTlCollapsed(false);
-    document.body.removeAttribute('data-panel-tab');
-    return;
-  }
-  /* 자막·음악·이미지 탭은 고르고 쓰는 화면 — 타임라인을 접어 도구 영역을 넓힌다 */
+  /* 자막·음악·이미지 탭은 고르고 쓰는 화면 — 도구 영역을 넓히고(모바일은 타임라인도 접음) */
   const wide = (tab === 'text' || tab === 'music' || tab === 'image');
-  setTlCollapsed(wide);
   if (wide) document.body.setAttribute('data-panel-tab', tab);
   else document.body.removeAttribute('data-panel-tab');
+  setTlCollapsed(isNarrowScreen() ? wide : false);
   setTimeout(() => fitPreview(), 80);
   setTimeout(() => fitPreview(), 300);
 }
@@ -3227,9 +3226,7 @@ toolsPanel.addEventListener('focusin', e => {
     setTimeout(() => fitPreview(), 120);
   }
 });
-window.addEventListener('resize', () => {
-  if (!isNarrowScreen()) { document.body.removeAttribute('data-panel-tab'); setTlCollapsed(false); }
-});
+window.addEventListener('resize', () => { lastLayoutTab = null; applyTabLayout(true); });
 
 /* ---------------- timeline interactions ---------------- */
 let tlDrag = null;
