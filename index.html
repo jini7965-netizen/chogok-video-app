@@ -230,6 +230,7 @@ canvas#preview.dragging{cursor:grabbing}
 /* 빨간 바를 손가락으로 잡기 쉽게: 세로선 둘레에 폭 32px 투명 히트박스 (pointer-events 는 이 히트박스만 auto) */
 .playhead .ph-hit{position:absolute; top:-6px; bottom:0; left:-16px; width:32px; background:transparent; border-radius:9px; pointer-events:auto; touch-action:none; cursor:ew-resize; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none}
 .playhead.drag .ph-hit{background:rgba(255,77,109,.14)}
+.playhead.tap-through, .playhead.tap-through *{pointer-events:none !important}
 .playhead.drag{box-shadow:0 0 18px rgba(255,77,109,.95)}
 .playhead.drag i{box-shadow:0 0 0 4px rgba(255,77,109,.3), 0 2px 8px rgba(0,0,0,.5)}
 body.ph-dragging{cursor:ew-resize}
@@ -3462,6 +3463,19 @@ function phStartScrub(e) {
   seekTo(phTimeAt(e.clientX));
   phUpdateEdge(e.clientX);
 }
+/* 빨간 바 히트박스를 그냥 톡 치면, 밑에 있던 클립·자막·음악을 고를 수 있게 통과시킨다. */
+function phTapThrough(clientX, clientY) {
+  const ph = $('#playhead');
+  if (!ph) return;
+  ph.classList.add('tap-through');
+  const hit = document.elementFromPoint(clientX, clientY);
+  ph.classList.remove('tap-through');
+  if (!hit) return;
+  const cl = hit.closest('.clip-block'), ov = hit.closest('.ov-block'), au = hit.closest('.audio-block');
+  if (cl && cl.dataset.id) selectClip(cl.dataset.id);
+  else if (ov && ov.dataset.id) selectOverlay(ov.dataset.id);
+  else if (au && au.dataset.id) selectAudio(au.dataset.id);
+}
 
 tlContent.addEventListener('pointerdown', e => {
   if (exporting) return;
@@ -3559,10 +3573,13 @@ window.addEventListener('pointermove', e => {
     renderTimeline();
   }
 });
-window.addEventListener('pointerup', () => {
+window.addEventListener('pointerup', e => {
   if (!tlDrag) return;
   hideTlTip();
-  if (tlDrag.kind === 'scrub') phStopScrub();
+  if (tlDrag.kind === 'scrub') {
+    phStopScrub();
+    if (!tlDrag.moved) phTapThrough(e.clientX, e.clientY);
+  }
   if (tlDrag.moved && tlDrag.snap) {
     history.past.push(tlDrag.snap);
     history.future.length = 0;
