@@ -226,7 +226,13 @@ canvas#preview.dragging{cursor:grabbing}
 .audio-block.sel{box-shadow:0 0 0 2px rgba(95,224,192,.45); border-color:#5fe0c0}
 .audio-block span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .playhead{position:absolute; top:0; bottom:0; width:2px; background:linear-gradient(180deg,#ff7a90,#ff4d6d); pointer-events:none; z-index:6; box-shadow:0 0 10px rgba(255,77,109,.6)}
-.playhead i{position:absolute; top:-1px; left:-5px; width:12px; height:10px; background:#ff4d6d; border-radius:2px 2px 5px 5px; box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.playhead i{position:absolute; top:-2px; left:-7px; width:16px; height:13px; background:#ff4d6d; border-radius:3px 3px 6px 6px; box-shadow:0 2px 6px rgba(0,0,0,.5); pointer-events:auto; touch-action:none; cursor:ew-resize}
+/* 빨간 바를 손가락으로 잡기 쉽게: 세로선 둘레에 폭 32px 투명 히트박스 (pointer-events 는 이 히트박스만 auto) */
+.playhead .ph-hit{position:absolute; top:-6px; bottom:0; left:-16px; width:32px; background:transparent; border-radius:9px; pointer-events:auto; touch-action:none; cursor:ew-resize; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none}
+.playhead.drag .ph-hit{background:rgba(255,77,109,.14)}
+.playhead.drag{box-shadow:0 0 18px rgba(255,77,109,.95)}
+.playhead.drag i{box-shadow:0 0 0 4px rgba(255,77,109,.3), 0 2px 8px rgba(0,0,0,.5)}
+body.ph-dragging{cursor:ew-resize}
 .track-empty{position:absolute; inset:0; display:grid; place-items:center; font-size:10px; color:#5d687c; pointer-events:none; letter-spacing:.2px}
 
 /* ---------- toolbox (bottom tabs) ---------- */
@@ -252,6 +258,7 @@ body[data-panel-tab=image] .tools-panel{height:170px}
 .pill.primary:hover{background:linear-gradient(135deg,#9a7dff,#6f52f2)}
 .pill.on{background:#2b2158; border-color:#8b6cff; color:#fff}
 .pill.warn{color:#ffb8c2; border-color:#5a2a34; background:#2a161d}
+.pill.busy{opacity:.55; pointer-events:none; cursor:default}
 .chip-strip{display:flex; gap:5px; overflow-x:auto; max-width:100%; padding-bottom:1px; scrollbar-width:none}
 .chip-strip::-webkit-scrollbar{display:none}
 .chip{
@@ -631,7 +638,7 @@ canvas#preview{-webkit-touch-callout:none}
           <div class="track" id="trackVideo" data-track="video"></div>
           <div class="track" id="trackOverlay" data-track="overlay"></div>
           <div class="track" id="trackAudio" data-track="audio"></div>
-          <div class="playhead" id="playhead"><i></i></div>
+          <div class="playhead" id="playhead"><i></i><div class="ph-hit" aria-hidden="true"></div></div>
         </div>
       </div>
     </div>
@@ -657,6 +664,7 @@ canvas#preview{-webkit-touch-callout:none}
 <input type="file" id="fileMedia" class="file-hidden" accept="video/*,image/*" multiple>
 <input type="file" id="fileImages" class="file-hidden" accept="image/*" multiple>
 <input type="file" id="fileAudio" class="file-hidden" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac">
+<input type="file" id="fileVideoAudio" class="file-hidden" accept="video/*">
 
 <div class="add-menu" id="addMenu" hidden>
   <button type="button" data-pick="images"><span>📷</span><b>사진 여러 장</b><i>사진첩에서 한 번에 여러 장</i></button>
@@ -1430,12 +1438,12 @@ function restoreSnapshot(json) {
 
 /* ---------------- toast ---------------- */
 let toastTimer = null;
-function toast(msg, kind) {
+function toast(msg, kind, hold) {
   const el = $('#toast');
   el.textContent = msg;
   el.className = 'toast show' + (kind ? ' ' + kind : '');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.className = 'toast'; }, 2600);
+  if (!hold) toastTimer = setTimeout(() => { el.className = 'toast'; }, 2600);
 }
 /* ============================================================
    assets · actions · sample
@@ -1541,7 +1549,7 @@ async function fileToAsset(file, forceKind) {
   if (!kind) kind = forceKind || null;
   if (!kind) return null;
   const url = URL.createObjectURL(file);
-  const asset = { id: uid('m'), kind, name: file.name.replace(/\.[^.]+$/, ''), url, size: file.size, thumb: '', duration: 0, aspect: kind === 'image' ? 1 : 9 / 16 };
+  const asset = { id: uid('m'), kind, name: file.name.replace(/\.[^.]+$/, ''), url, size: file.size, thumb: '', duration: 0, aspect: kind === 'image' ? 1 : 9 / 16, file };
   if (kind === 'video') await probeVideo(asset);
   else if (kind === 'image') await probeImage(asset);
   else await probeAudio(asset);
@@ -1632,6 +1640,161 @@ function addAudioAsset(asset, startAt) {
   };
   state.audios.push(item);
   return item;
+}
+
+/* ---------------- 영상에서 소리 추출 (decodeAudioData → 16bit 스테레오 WAV) ----------------
+   - 음악 탭 “🎬 영상에서 음악 추출”: 고른 영상 파일의 오디오 트랙 전체를 뽑는다.
+   - 편집 탭 “🎵 소리 분리”: 타임라인 영상 클립이 실제로 쓰는 구간만 뽑아 같은 위치에 놓고 원본은 음소거.
+   - iPhone 사파리는 MP4/MOV(AAC)를 decodeAudioData로 잘 풀어 준다. 코덱이 안 풀리면 안내 토스트. */
+let extractBusy = false;
+function extractButtons() {
+  return Array.from(document.querySelectorAll('[data-act=extractVideoAudio],[data-act=splitClipAudio]'));
+}
+function beginExtract() {
+  if (extractBusy) { toast('이미 소리를 뽑고 있어요. 조금만 기다려 주세요.', 'warn'); return false; }
+  extractBusy = true;
+  extractButtons().forEach(b => { b.classList.add('busy'); b.setAttribute('aria-busy', 'true'); b.disabled = true; });
+  toast('음악 추출 중…', 'ok', true);   // 끝날 때까지 유지되는 안내
+  return true;
+}
+function endExtract() {
+  extractBusy = false;
+  extractButtons().forEach(b => { b.classList.remove('busy'); b.removeAttribute('aria-busy'); b.disabled = false; });
+}
+
+/* AudioBuffer의 [startSec, endSec) 구간 → 항상 2채널 16bit PCM WAV Blob */
+function audioBufferToWavStereo(buf, startSec, endSec) {
+  const sr = buf.sampleRate || 44100;
+  const s0 = clamp(Math.floor((startSec || 0) * sr), 0, Math.max(0, buf.length - 1));
+  const s1 = clamp(Math.ceil((endSec == null ? buf.duration : endSec) * sr), s0 + 1, buf.length);
+  const len = Math.max(1, s1 - s0);
+  const srcL = buf.getChannelData(0);
+  const srcR = buf.numberOfChannels > 1 ? buf.getChannelData(1) : srcL;
+  const bytes = 44 + len * 4;
+  const ab = new ArrayBuffer(bytes), v = new DataView(ab);
+  const str = (off, s) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, bytes - 8, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, len * 4, true);
+  let off = 44;
+  for (let i = s0; i < s1; i++) {
+    let l = srcL[i] || 0, r = srcR[i] || 0;
+    l = l < -1 ? -1 : l > 1 ? 1 : l;
+    r = r < -1 ? -1 : r > 1 ? 1 : r;
+    v.setInt16(off, l < 0 ? l * 0x8000 : l * 0x7fff, true); off += 2;
+    v.setInt16(off, r < 0 ? r * 0x8000 : r * 0x7fff, true); off += 2;
+  }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+
+/* 영상 파일 → AudioBuffer. 사파리는 콜백형만 있는 버전도 있어 둘 다 받는다. */
+async function decodeAudioFromFile(file) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) throw new Error('no-audiocontext');
+  const ac = new AC();                     // 아이폰: 사용자 제스처 안에서 먼저 만든다
+  try {
+    const blob = (file instanceof Blob) ? file : new Blob([file]);
+    const arr = await blob.arrayBuffer();
+    if (!arr || !arr.byteLength) throw new Error('empty-file');
+    return await new Promise((resolve, reject) => {
+      let settled = false;
+      const ok = b => { if (!settled) { settled = true; resolve(b); } };
+      const bad = er => { if (!settled) { settled = true; reject(er || new Error('decode-failed')); } };
+      let p = null;
+      try { p = ac.decodeAudioData(arr.slice(0), ok, bad); } catch (err) { bad(err); return; }
+      if (p && typeof p.then === 'function') p.then(ok, bad);
+    });
+  } finally {
+    try { ac.close(); } catch (e) { }
+  }
+}
+
+/* 뽑은 WAV Blob을 음악 트랙에 넣는다. duration/start는 뽑은 구간에 맞춰 정확히 지정. */
+function addExtractedAudio(blob, opts) {
+  const o = opts || {};
+  const fname = (o.name || '영상 소리') + '.wav';
+  let file;
+  try { file = new File([blob], fname, { type: 'audio/wav', lastModified: Date.now() }); }
+  catch (err) { file = blob; try { file.name = fname; } catch (e) { } }
+  const total = totalDuration();
+  let start = Math.max(0, o.start == null ? 0 : o.start);
+  if (total > 0) start = Math.min(start, Math.max(0, total - 0.2));
+  let dur = Math.max(0.2, o.duration || 0);
+  if (total > 0) dur = Math.min(dur, Math.max(0.2, total - start));
+  const asset = {
+    id: uid('m'), kind: 'audio', name: fname.replace(/\.[^.]+$/, ''), url: URL.createObjectURL(file),
+    size: file.size || blob.size || 0, thumb: '', duration: Math.max(0.2, o.duration || dur), aspect: 9 / 16, file
+  };
+  assets.set(asset.id, asset);
+  pushHistory();
+  const item = addAudioAsset(asset, start);
+  item.start = start;
+  item.duration = dur;
+  item.volume = o.volume == null ? 0.9 : o.volume;
+  if (o.select) state.selected = { type: 'audio', id: item.id };
+  renderAll();
+  return item;
+}
+
+function extractFailToast(err) {
+  const msg = String((err && (err.message || err.name)) || err || '');
+  console.warn('영상 소리 추출 실패:', err);
+  if (msg === 'no-audiocontext') { toast('이 브라우저는 소리 추출을 지원하지 않아요. 사파리 최신 버전에서 다시 시도해 주세요.', 'warn'); return; }
+  if (msg === 'empty-file') { toast('파일을 읽지 못했어요. 다시 골라 주세요.', 'warn'); return; }
+  toast('이 영상의 소리를 뽑지 못했어요. MP4·MOV는 대부분 되는데 일부 코덱은 브라우저가 지원하지 않아요. 카메라로 찍었거나 MP4로 저장한 영상으로 다시 시도해 주세요.', 'warn');
+}
+
+/* 음악 탭: 영상 파일 → 소리 전체 */
+async function extractAudioFromVideoFile(file) {
+  if (!file) return null;
+  const base = String(file.name || '영상').replace(/\.[^.]+$/, '');
+  if (!beginExtract()) return null;
+  try {
+    const buf = await decodeAudioFromFile(file);
+    if (!buf || !buf.length) throw new Error('decode-failed');
+    const blob = audioBufferToWavStereo(buf, 0, buf.duration);
+    const item = addExtractedAudio(blob, { name: base + ' 소리', start: 0, duration: buf.duration, select: true });
+    toast('🎬 ' + base + '에서 소리를 뽑아 음악 트랙에 넣었어요 · ' + fmtTime(buf.duration), 'ok');
+    return item;
+  } catch (err) {
+    extractFailToast(err);
+    return null;
+  } finally { endExtract(); }
+}
+
+/* 편집 탭: 선택한 영상 클립의 소리만 분리 */
+async function splitClipAudio() {
+  const c = selectedClip();
+  if (!c) { toast('먼저 타임라인에서 영상 클립을 골라 주세요.', 'warn'); return null; }
+  if (c.kind !== 'video') { toast('소리 분리는 영상 클립에서만 돼요. 사진 클립에는 소리가 없어요.', 'warn'); return null; }
+  const asset = assets.get(c.assetId);
+  if (!asset) { toast('이 클립의 원본 파일을 찾지 못했어요.', 'warn'); return null; }
+  const spd = c.speed || 1;
+  const segStart = Math.max(0, c.inPoint || 0);
+  const segEnd = segStart + c.duration * spd;
+  if (!beginExtract()) return null;
+  try {
+    let src = asset.file || null;
+    if (!src && asset.url) { const res = await fetch(asset.url); src = await res.blob(); }
+    if (!src) throw new Error('empty-file');
+    const buf = await decodeAudioFromFile(src);
+    const end = Math.min(buf.duration, segEnd);
+    if (end - segStart < 0.05) throw new Error('decode-failed');
+    const blob = audioBufferToWavStereo(buf, segStart, end);
+    const item = addExtractedAudio(blob, {
+      name: (c.name || '영상') + ' 소리', start: c.start,
+      duration: Math.max(0.2, Math.min(c.duration, end - segStart))
+    });
+    // 소리를 떼어 냈으니 원본 클립은 음소거 (실행 취소하면 원래대로)
+    if (!c.muted) { c.muted = true; applyClipAudio(c); }
+    renderAll();
+    toast('🎵 ' + (c.name || '영상') + ' 소리를 음악 트랙으로 분리했어요 · 원본 클립은 음소거' + (spd !== 1 ? ' (배속 클립이라 소리는 원래 속도)' : ''), 'ok');
+    return item;
+  } catch (err) {
+    extractFailToast(err);
+    return null;
+  } finally { endExtract(); }
 }
 
 /* ---------------- stickers ---------------- */
@@ -2254,6 +2417,7 @@ function editPanelHTML() {
       <button class="pill" data-act="clipLeft" title="앞 클립과 순서 바꾸기">◀ 순서</button>
       <button class="pill" data-act="clipRight" title="뒤 클립과 순서 바꾸기">순서 ▶</button>
       <button class="pill" data-act="split">✂ 분할</button>
+      ${c.kind === 'video' ? '<button class="pill" data-act="splitClipAudio" title="이 클립의 소리만 음악 트랙으로 떼어 내기 (원본은 음소거)">🎵 소리 분리</button>' : ''}
       <button class="pill warn" data-act="del">🗑 삭제</button>
     </div>
     <div class="tool-row">
@@ -2850,6 +3014,7 @@ function musicPanelHTML() {
     <div class="tool-row">
       <button class="pill primary" data-act="pickAudio">＋ 음악 파일</button>
       <span class="hint-inline">MP3 · M4A · WAV</span>
+      <button class="pill" data-act="extractVideoAudio" title="영상 파일을 골라 소리만 뽑아 음악 트랙에 넣습니다">🎬 영상에서 음악 추출</button>
       ${libChips}
       <div class="spacer" style="flex:1 1 auto"></div>
       <span class="tool-label" style="min-width:auto">전체</span>
@@ -3098,6 +3263,8 @@ toolsPanel.addEventListener('click', e => {
   else if (act === 'pickImages') { pendingAppendScroll = true; pickImages('clip'); }
   else if (act === 'pickImagesOverlay') pickImages('overlay');
   else if (act === 'pickAudio') $('#fileAudio').click();
+  else if (act === 'extractVideoAudio') { try { $('#fileVideoAudio').value = ''; } catch (err) { } $('#fileVideoAudio').click(); }
+  else if (act === 'splitClipAudio') splitClipAudio();
   else if (act === 'addText') addTextOverlay();
   else if (act === 'addAsset') {
     const asset = assets.get(b.dataset.asset);
@@ -3239,8 +3406,66 @@ function showTlTip(e, c) {
   tip.style.top = Math.max(6, e.clientY - 38) + 'px';
 }
 function hideTlTip() { const t = $('#tlTip'); if (t) t.hidden = true; }
+
+/* ---------------- 재생헤드(빨간 바) 직접 드래그 + 가장자리 자동 스크롤 ----------------
+   - 빨간 바 위 32px 히트박스(.ph-hit)를 잡으면 바로 시간이 따라온다.
+   - 드래그 중 손가락이 타임라인 뷰포트 좌우 38px 안으로 들어오면 타임라인을 계속 밀어
+     0초부터 영상 맨 끝까지 한 번에 옮겨 다닐 수 있다. */
+const PH_EDGE = 38;                 // 자동 스크롤이 시작되는 좌우 여백(px)
+let phEdgeRAF = 0, phEdgeDir = 0, phEdgePower = 0, phEdgeLast = 0, phClientX = 0;
+
+function phTimeAt(clientX) {
+  const rect = tlContent.getBoundingClientRect();
+  return clamp((clientX - rect.left) / state.zoom, 0, Math.max(0, totalDuration()));
+}
+function phUpdateEdge(clientX) {
+  phClientX = clientX;
+  const sc = $('#tlScroll');
+  if (!sc || sc.clientWidth <= 0) { phEdgeDir = 0; return; }
+  const r = sc.getBoundingClientRect();
+  const fromRight = r.right - clientX, fromLeft = clientX - r.left;
+  let dir = 0, power = 0;
+  if (fromRight < PH_EDGE) { dir = 1; power = (PH_EDGE - fromRight) / PH_EDGE; }
+  else if (fromLeft < PH_EDGE) { dir = -1; power = (PH_EDGE - fromLeft) / PH_EDGE; }
+  phEdgeDir = dir;
+  phEdgePower = clamp(power, 0, 1);
+  if (dir) {
+    if (!phEdgeRAF) { phEdgeLast = performance.now(); phEdgeRAF = requestAnimationFrame(phEdgeStep); }
+  } else if (phEdgeRAF) { cancelAnimationFrame(phEdgeRAF); phEdgeRAF = 0; }
+}
+function phEdgeStep(now) {
+  phEdgeRAF = 0;
+  const sc = $('#tlScroll');
+  if (!tlDrag || tlDrag.kind !== 'scrub' || !phEdgeDir || !sc) return;
+  const dt = Math.min(0.05, Math.max(0.001, (now - phEdgeLast) / 1000));
+  phEdgeLast = now;
+  const before = sc.scrollLeft;
+  sc.scrollLeft = before + phEdgeDir * (300 + 1050 * phEdgePower) * dt;
+  const moved = Math.abs(sc.scrollLeft - before) > 0.4;   // 끝(0초·맨끝)에 닿으면 더 밀어도 안 움직인다
+  seekTo(phTimeAt(phClientX));
+  if (moved) phEdgeRAF = requestAnimationFrame(phEdgeStep);
+}
+function phStopScrub() {
+  if (phEdgeRAF) { cancelAnimationFrame(phEdgeRAF); phEdgeRAF = 0; }
+  phEdgeDir = 0; phEdgePower = 0;
+  const ph = $('#playhead');
+  if (ph) ph.classList.remove('drag');
+  document.body.classList.remove('ph-dragging');
+}
+function phStartScrub(e) {
+  if (state.playing) setPlaying(false);
+  hideTlTip();
+  tlDrag = { kind: 'scrub', moved: false, snap: null };
+  const ph = $('#playhead');
+  if (ph) ph.classList.add('drag');
+  document.body.classList.add('ph-dragging');
+  seekTo(phTimeAt(e.clientX));
+  phUpdateEdge(e.clientX);
+}
+
 tlContent.addEventListener('pointerdown', e => {
   if (exporting) return;
+  if (e.target.closest('#playhead')) { e.preventDefault(); phStartScrub(e); return; }
   const rect = tlContent.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const ovEl = e.target.closest('.ov-block');
@@ -3289,6 +3514,12 @@ tlContent.addEventListener('pointerdown', e => {
 });
 window.addEventListener('pointermove', e => {
   if (!tlDrag) return;
+  if (tlDrag.kind === 'scrub') {
+    tlDrag.moved = true;
+    seekTo(phTimeAt(e.clientX));
+    phUpdateEdge(e.clientX);
+    return;
+  }
   const rect = tlContent.getBoundingClientRect();
   const x = e.clientX - rect.left;
   if (tlDrag.kind === 'seek') { seekTo(x / state.zoom); return; }
@@ -3331,6 +3562,7 @@ window.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', () => {
   if (!tlDrag) return;
   hideTlTip();
+  if (tlDrag.kind === 'scrub') phStopScrub();
   if (tlDrag.moved && tlDrag.snap) {
     history.past.push(tlDrag.snap);
     history.future.length = 0;
@@ -3340,6 +3572,7 @@ window.addEventListener('pointerup', () => {
   tlDrag = null;
   renderTimeline();
 });
+window.addEventListener('pointercancel', () => { if (tlDrag && tlDrag.kind === 'scrub') { phStopScrub(); tlDrag = null; } });
 
 /* ---------------- preview canvas interactions ---------------- */
 let pointerOp = null;
@@ -3466,6 +3699,13 @@ $('#fileImages').addEventListener('change', e => {
   handlePickedFiles(e, { asOverlay });
 });
 $('#fileAudio').addEventListener('change', e => handlePickedFiles(e, { forceKind: 'audio' }));
+/* 영상에서 음악 추출: 고른 영상 하나의 오디오 트랙만 뽑아 음악으로 */
+$('#fileVideoAudio').addEventListener('change', e => {
+  const input = e.target;
+  const f = Array.from(input.files || [])[0];
+  if (f) extractAudioFromVideoFile(f);
+  try { input.value = ''; } catch (err) { }
+});
 
 /* 타임라인 끝 ＋ / 빈 화면 파일 선택: 사진 여러 장 · 영상·사진 중 바로 고르는 메뉴 */
 const addMenu = $('#addMenu');
@@ -3866,6 +4106,7 @@ function boot() {
     bulkInfo: () => ({ bulkSpeed, photoDefault, lastTextFont }),
     setBulkSpeed: v => { bulkSpeed = v; },
     setPhotoDefault: v => { photoDefault = v; },
+    extract: { fromFile: extractAudioFromVideoFile, fromClip: splitClipAudio, busy: () => extractBusy },
     historyInfo: () => ({ past: history.past.length, future: history.future.length })
   };
 }
