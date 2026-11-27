@@ -313,6 +313,18 @@ body[data-panel-tab=image] .tools-panel{height:170px}
   flex:0 1 330px; min-width:170px; height:46px; background:#0d1119; border:1px solid #263042;
   border-radius:8px; padding:5px 8px; font-size:11.5px; line-height:1.4; resize:none;
 }
+.tt-area::placeholder{color:#5f6b82; opacity:1}
+/* 자막 방향 토글 + 이모티콘 빠른 추가 */
+.pill.dir.on{background:linear-gradient(180deg,#3a2c78,#2b2158); border-color:#8b6cff; color:#fff}
+.emoji-strip{display:flex; gap:5px; overflow-x:auto; max-width:100%; padding:1px 0 2px; scrollbar-width:none}
+.emoji-strip::-webkit-scrollbar{display:none}
+.emoji-btn{
+  flex:0 0 auto; width:34px; height:34px; padding:0; border-radius:9px; border:1px solid #2c374b;
+  background:#151b26; font-size:19px; line-height:1; display:grid; place-items:center; cursor:pointer;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+}
+.emoji-btn:hover{border-color:#8b6cff; background:#241d44}
+.emoji-btn:active{transform:scale(.92); background:#2c2354}
 .sticker-mini{
   display:flex; gap:5px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
   max-width:100%; min-width:0; padding:2px 0 5px; scrollbar-width:none;
@@ -790,7 +802,10 @@ const FONTS = [
   { key: 'noto', name: '노토 산스', css: '"Noto Sans KR","Apple SD Gothic Neo",sans-serif' }
 ];
 function fontDef(key) { return FONTS.find(f => f.key === key) || FONTS[0]; }
-function fontStack(ov) { return fontDef(ov && ov.fontFamily).css; }
+/* 이모지(😊💛🎉…)가 흑백/빈칸이 되지 않게 색 이모지 글꼴을 항상 체인 끝에 붙인다 */
+const EMOJI_STACK = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+function withEmoji(css) { return String(css).replace(/,sans-serif\s*$/, '') + ',' + EMOJI_STACK; }
+function fontStack(ov) { return withEmoji(fontDef(ov && ov.fontFamily).css); }
 function fontCss(ov, weight, sizePx) { return `${weight || 800} ${sizePx}px ${fontStack(ov)}`; }
 const fontLoaded = new Set();
 function loadFont(key) {
@@ -1153,6 +1168,10 @@ function drawPlaceholder(g, W, H, c) {
 }
 
 /* ---------------- overlays ---------------- */
+const TEXT_PLACEHOLDER = '자막을 입력하세요';
+/* 자막 탭 이모티콘 빠른 추가 — 아이들 영상에 자주 쓰는 것만 */
+const TEXT_EMOJIS = ['😊', '💛', '❤️', '🎉', '👏', '✨', '🌸', '🐻', '🐣', '🎂', '🎄', '🎈', '🥰', '👍'];
+
 function overlayMetrics(g, W, H, ov) {
   const k = W / 1080;
   if (ov.kind === 'text') {
@@ -1161,24 +1180,45 @@ function overlayMetrics(g, W, H, ov) {
     g.font = fontCss(ov, weight, fs);
     const lines = String(ov.text == null ? '' : ov.text).split('\n');
     const lh = fs * (ov.lineHeight || 1.26);
-    let tw = 0;
-    for (const l of lines) tw = Math.max(tw, g.measureText(l || ' ').width);
     const padX = (ov.padX == null ? 26 : ov.padX) * k;
     const padY = (ov.padY == null ? 14 : ov.padY) * k;
-    return { w: tw + padX * 2, h: lines.length * lh + padY * 2, fs, lh, lines, padX, padY, k };
+    if (ov.vertical) {
+      /* 세로쓰기: 줄 하나가 한 열, 열 안에서 글자 하나씩 위→아래.
+         첫 줄이 가장 오른쪽 열(전통 세로쓰기처럼 가로 글자를 시계방향으로 돌린 모양). */
+      const cols = lines.map(l => Array.from(l));
+      let colW = fs * 1.12;
+      for (const c of cols) for (const ch of c) colW = Math.max(colW, g.measureText(ch).width * 1.12);
+      const maxLen = Math.max(1, ...cols.map(c => c.length));
+      return { w: cols.length * colW + padX * 2, h: maxLen * lh + padY * 2,
+               fs, lh, lines, cols, colW, padX, padY, k, vertical: true };
+    }
+    let tw = 0;
+    for (const l of lines) tw = Math.max(tw, g.measureText(l || ' ').width);
+    return { w: tw + padX * 2, h: lines.length * lh + padY * 2, fs, lh, lines, padX, padY, k, vertical: false };
   }
   const a = assets.get(ov.assetId);
   const ar = (a && a.aspect) || 1;
   const w = Math.max(8, (ov.width || 0.3) * W);
   return { w, h: w / ar, k };
 }
-function drawOverlay(g, W, H, ov) {
+/* 빈 자막은 미리보기에서 “자막을 입력하세요” 안내 박스 크기로 재서 선택 테두리·히트박스를 잡는다 */
+function metricsSource(ov) {
+  return textIsEmpty(ov) ? { ...ov, text: TEXT_PLACEHOLDER } : ov;
+}
+function textIsEmpty(ov) { return ov && ov.kind === 'text' && !String(ov.text == null ? '' : ov.text).trim(); }
+
+function drawOverlay(g, W, H, ov, opts) {
   if (ov.kind === 'text') {
-    const m = overlayMetrics(g, W, H, ov);
+    const isEmpty = textIsEmpty(ov);
+    const hint = !!(opts && opts.hint);
+    if (isEmpty && !hint) return;                 // 내보내기·썸네일: 빈 자막은 아무것도 찍지 않는다
+    const src = isEmpty ? { ...ov, text: TEXT_PLACEHOLDER } : ov;
+    const m = overlayMetrics(g, W, H, src);
     const cx = (ov.x == null ? 0.5 : ov.x) * W;
     const cy = (ov.y == null ? 0.8 : ov.y) * H;
+    const baseAlpha = clamp(ov.opacity == null ? 1 : ov.opacity, 0, 1);
     g.save();
-    g.globalAlpha = clamp(ov.opacity == null ? 1 : ov.opacity, 0, 1);
+    g.globalAlpha = isEmpty ? baseAlpha * 0.85 : baseAlpha;
     g.translate(cx, cy);
     g.rotate((ov.rot || 0) * Math.PI / 180);
     if ((ov.bgOpacity || 0) > 0.001) {
@@ -1186,7 +1226,15 @@ function drawOverlay(g, W, H, ov) {
       g.fillStyle = hexToRgba(ov.bg || '#000000', ov.bgOpacity);
       g.fill();
     }
-    if ((ov.borderWidth || 0) > 0) {
+    if (isEmpty) {
+      /* 아직 아무것도 안 적었을 때만 보이는 점선 안내 테두리 (미리보기 전용) */
+      roundRect(g, -m.w / 2, -m.h / 2, m.w, m.h, (ov.radius == null ? 18 : ov.radius) * m.k);
+      g.setLineDash([8 * m.k, 6 * m.k]);
+      g.strokeStyle = 'rgba(202,186,255,.95)';
+      g.lineWidth = Math.max(1, 2 * m.k);
+      g.stroke();
+      g.setLineDash([]);
+    } else if ((ov.borderWidth || 0) > 0) {
       roundRect(g, -m.w / 2, -m.h / 2, m.w, m.h, (ov.radius == null ? 18 : ov.radius) * m.k);
       g.strokeStyle = ov.borderColor || '#ffffff';
       g.lineWidth = ov.borderWidth * m.k;
@@ -1195,10 +1243,18 @@ function drawOverlay(g, W, H, ov) {
     g.font = fontCss(ov, ov.weight || 800, m.fs);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillStyle = ov.color || '#ffffff';
-    if (ov.shadow) { g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = m.fs * 0.3; g.shadowOffsetY = m.fs * 0.08; }
-    const y0 = -m.h / 2 + m.padY + m.lh / 2;
-    m.lines.forEach((line, i) => g.fillText(line, 0, y0 + i * m.lh));
+    g.fillStyle = isEmpty ? 'rgba(226,236,252,.62)' : (ov.color || '#ffffff');
+    if (!isEmpty && ov.shadow) { g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = m.fs * 0.3; g.shadowOffsetY = m.fs * 0.08; }
+    if (m.vertical) {
+      m.cols.forEach((chars, ci) => {
+        const colX = (m.w / 2 - m.padX) - (ci + 0.5) * m.colW;
+        const y0 = -m.h / 2 + m.padY + m.lh / 2;
+        chars.forEach((ch, j) => g.fillText(ch, colX, y0 + j * m.lh));
+      });
+    } else {
+      const y0 = -m.h / 2 + m.padY + m.lh / 2;
+      m.lines.forEach((line, i) => g.fillText(line, 0, y0 + i * m.lh));
+    }
     g.restore();
     return;
   }
@@ -1227,7 +1283,7 @@ function drawFrame(g, W, H, t, withSelection) {
   if (c && t < c.start + c.duration + 1e-6) drawClipFrame(g, W, H, c, Math.min(t, c.start + c.duration - 0.001));
   const list = state.overlays.slice().sort((a, b) => (a.layer || 0) - (b.layer || 0));
   for (const ov of list) {
-    if (t >= ov.start - 1e-9 && t <= ov.end + 1e-9) drawOverlay(g, W, H, ov);
+    if (t >= ov.start - 1e-9 && t <= ov.end + 1e-9) drawOverlay(g, W, H, ov, { hint: !!withSelection });
   }
   if (withSelection) drawSelection(g, W, H);
   g.restore();
@@ -1236,7 +1292,7 @@ function drawSelection(g, W, H) {
   const ov = selectedOverlay();
   if (!ov) return;
   if (state.time < ov.start || state.time > ov.end) return;
-  const m = overlayMetrics(g, W, H, ov);
+  const m = overlayMetrics(g, W, H, metricsSource(ov));
   const k = W / 1080;
   const cx = ov.x * W, cy = ov.y * H;
   g.save();
@@ -1269,7 +1325,7 @@ function drawSelection(g, W, H) {
   g.restore();
 }
 function handlePoints(ov, W, H) {
-  const m = overlayMetrics(ctx, W, H, ov);
+  const m = overlayMetrics(ctx, W, H, metricsSource(ov));
   const k = W / 1080;
   const rot = (ov.rot || 0) * Math.PI / 180;
   const cx = ov.x * W, cy = ov.y * H;
@@ -1289,7 +1345,7 @@ function hitOverlay(px, py) {
   for (let i = state.overlays.length - 1; i >= 0; i--) {
     const ov = state.overlays[i];
     if (state.time < ov.start || state.time > ov.end) continue;
-    const m = overlayMetrics(ctx, W, H, ov);
+    const m = overlayMetrics(ctx, W, H, metricsSource(ov));
     const rot = -(ov.rot || 0) * Math.PI / 180;
     const dx = px - ov.x * W, dy = py - ov.y * H;
     const lx = dx * Math.cos(rot) - dy * Math.sin(rot);
@@ -2106,7 +2162,7 @@ function addTextOverlay(text) {
   pushHistory();
   const w = overlayWindow(3);
   const ov = {
-    id: uid('o'), kind: 'text', text: text || '자막을 입력하세요',
+    id: uid('o'), kind: 'text', text: text || '', vertical: false,
     start: w.start, end: w.end, x: 0.5, y: 0.78,
     fontFamily: lastTextFont,
     size: 62, color: '#ffffff', bg: '#0b0f16', bgOpacity: 0.55,
@@ -2520,6 +2576,18 @@ function textPanelHTML() {
     </div>
     <div class="tool-row">
       <textarea class="tt-area" id="ovText" data-ov="text" placeholder="자막을 입력하세요">${esc(ov.text || '')}</textarea>
+    </div>
+    <div class="tool-row">
+      <span class="tool-label">이모티콘</span>
+      <div class="emoji-strip">${TEXT_EMOJIS.map(em => `<button type="button" class="emoji-btn" data-act="insEmoji" data-emoji="${em}" title="${em} 넣기">${em}</button>`).join('')}</div>
+    </div>
+    <div class="tool-row">
+      <span class="tool-label">방향</span>
+      <button class="pill dir${ov.vertical ? '' : ' on'}" data-act="setDir" data-dir="h" title="가로쓰기">가로 ↔</button>
+      <button class="pill dir${ov.vertical ? ' on' : ''}" data-act="setDir" data-dir="v" title="한 글자씩 위에서 아래로">세로 ↕</button>
+      <span class="hint-inline">세로는 한 글자씩 위→아래, 줄을 바꾸면 오른쪽에 새 열이 생겨요.</span>
+    </div>
+    <div class="tool-row">
       ${ctl('크기', rng('ov', 'size', 14, 200, 1, ov.size) + valSpan(Math.round(ov.size) + 'px'))}
       ${ctl('글자색', `<input type="color" data-ov="color" value="${ov.color}">`)}
       ${ctl('배경', `<input type="color" data-ov="bg" value="${ov.bg}">` + rng('ov', 'bgOpacity', 0, 1, 0.02, ov.bgOpacity) + valSpan(pct(ov.bgOpacity)))}
@@ -3142,7 +3210,17 @@ function renderAll() {
 /* ---------------- tool panel edits ---------------- */
 const toolsPanel = $('#toolsPanel');
 let editSnapshot = null;
-toolsPanel.addEventListener('focusin', () => { if (!editSnapshot) editSnapshot = snapshot(); });
+toolsPanel.addEventListener('focusin', e => {
+  const t = e.target;
+  /* 예전에 만들어진 ‘자막을 입력하세요’ 기본 문구는 칸을 누르는 순간 비운다 → 바로 타이핑 */
+  if (t && t.id === 'ovText' && String(t.value || '').trim() === TEXT_PLACEHOLDER) {
+    t.value = '';
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+    try { t.setSelectionRange(0, 0); } catch (err) { }
+  }
+  rememberOvCaret(t);
+  if (!editSnapshot) editSnapshot = snapshot();
+});
 toolsPanel.addEventListener('focusout', () => {
   setTimeout(() => {
     if (!editSnapshot) return;
@@ -3166,6 +3244,44 @@ function applyOverlayProp(ov, p, v) {
   else if (p === 'end') v = clamp(v, ov.start + 0.1, Math.max(ov.start + 0.1, totalDuration() || 3600));
   ov[p] = v;
 }
+/* ---------------- 자막 이모티콘 빠른 추가 ----------------
+   버튼을 누르면 커서 자리(없으면 끝)에 바로 들어가고, 입력 이벤트를 그대로 태워
+   ov.text 갱신 → 미리보기 캔버스 → 타임라인 자막 블록까지 한 번에 반영된다. */
+let ovCaret = { start: 0, end: 0, id: null };
+function rememberOvCaret(t) {
+  if (!t || t.id !== 'ovText') return;
+  try {
+    const ov = selectedOverlay();
+    ovCaret = { start: t.selectionStart || 0, end: t.selectionEnd || 0, id: ov ? ov.id : null };
+  } catch (e) { }
+}
+document.addEventListener('selectionchange', () => rememberOvCaret(document.activeElement));
+function insertTextEmoji(ch) {
+  if (!ch) return;
+  const ov = selectedOverlay();
+  if (!ov || ov.kind !== 'text') { toast('먼저 자막을 선택해 주세요.', 'warn'); return; }
+  const ta = $('#ovText');
+  if (!ta) {                      // 자막 탭이 아닌 곳에서 눌렸을 때 — 바로 끝에 붙인다
+    pushHistory();
+    ov.text = String(ov.text || '') + ch;
+    updateOverlayBlockEl(ov);
+    drawNow();
+    return;
+  }
+  const val = ta.value;
+  let s = val.length, e = val.length;
+  if (document.activeElement === ta || ovCaret.id === ov.id) {
+    s = clamp(ovCaret.start, 0, val.length);
+    e = clamp(ovCaret.end, s, val.length);
+  }
+  ta.value = val.slice(0, s) + ch + val.slice(e);
+  const pos = s + ch.length;
+  ta.focus();
+  try { ta.setSelectionRange(pos, pos); } catch (err) { }
+  ovCaret = { start: pos, end: pos, id: ov.id };
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function updateOverlayBlockEl(ov) {
   const el = tlContent.querySelector(`.ov-block[data-id="${ov.id}"]`);
   if (!el) return;
@@ -3320,6 +3436,17 @@ toolsPanel.addEventListener('click', e => {
   else if (act === 'extractVideoAudio') { try { $('#fileVideoAudio').value = ''; } catch (err) { } $('#fileVideoAudio').click(); }
   else if (act === 'splitClipAudio') splitClipAudio();
   else if (act === 'addText') addTextOverlay();
+  else if (act === 'setDir') {
+    const ov2 = selectedOverlay();
+    if (!ov2 || ov2.kind !== 'text') { toast('먼저 자막을 선택해 주세요.', 'warn'); return; }
+    const vert = b.dataset.dir === 'v';
+    if (!!ov2.vertical === vert) return;
+    pushHistory();
+    ov2.vertical = vert;
+    renderRight(); renderTimeline(); drawNow();
+    toast(vert ? '세로쓰기로 바꿨어요 (한 글자씩 위→아래)' : '가로쓰기로 바꿨어요', 'ok');
+  }
+  else if (act === 'insEmoji') insertTextEmoji(b.dataset.emoji);
   else if (act === 'addAsset') {
     const asset = assets.get(b.dataset.asset);
     if (!asset) return;
@@ -4219,6 +4346,7 @@ function boot() {
   window.__editor = {
     state, assets, totalDuration, seekTo, renderAll, loadSample, splitAtPlayhead,
     handlePoints, hitOverlay, overlayMetrics, canvas, FONTS, fontDef, fontStack, loadFont,
+    drawFrame, drawOverlay, metricsSource, insertTextEmoji, TEXT_EMOJIS,
     clipById, addClipFromAsset, setClipDuration, clipMaxDuration, ensureSticker,
     bgm: { presets: BGM_PRESETS, build: bgmBuild, add: addBgmPreset,
            previewEl: () => bgmPreviewEl, stopPreview: stopBgmPreview }, tl: { collapsed: () => tlCollapsed, set: setTlCollapsed },
