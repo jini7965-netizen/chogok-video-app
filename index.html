@@ -100,6 +100,7 @@ canvas#preview{
   display:block; background:#000; border-radius:14px;
   box-shadow:0 22px 55px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.09), 0 0 0 6px rgba(255,255,255,.03);
   touch-action:none; cursor:grab;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
 canvas#preview.dragging{cursor:grabbing}
 .preview-hud{
@@ -282,6 +283,16 @@ body[data-panel-tab=image] .tools-panel{height:170px}
 .pill.primary:hover{background:linear-gradient(135deg,#9a7dff,#6f52f2)}
 .pill.on{background:#2b2158; border-color:#8b6cff; color:#fff}
 .pill.warn{color:#ffb8c2; border-color:#5a2a34; background:#2a161d}
+/* 원본 영상 소리 끄기/켜기 — 편집 탭 맨 위에 눈에 띠게 */
+.pill.orig-mute{
+  padding:6px 12px; font-size:11.5px; font-weight:800; border-radius:10px;
+  border-color:#3c4a63; background:#182131; color:#cfd9ea;
+}
+.pill.orig-mute:hover{background:#202b40; color:#fff; border-color:#55688a}
+.pill.orig-mute.on{
+  border-color:#ff9fae; background:#3a1720; color:#ffdbe2;
+  box-shadow:0 0 0 2px rgba(255,143,163,.22), 0 6px 16px rgba(0,0,0,.35);
+}
 .pill.busy{opacity:.55; pointer-events:none; cursor:default}
 .chip-strip{display:flex; gap:5px; overflow-x:auto; max-width:100%; padding-bottom:1px; scrollbar-width:none}
 .chip-strip::-webkit-scrollbar{display:none}
@@ -489,9 +500,9 @@ label.chip.chk.mute-track.on{border-color:#ff8fa3; background:#3a1720; color:#ff
   .tt-area{flex:1 1 100%; min-width:0}
   .music-row{max-width:none}
   /* 자막 탭: 타임라인을 접고 자막 편집 패널을 넓게 (자막 입력·글자체·크기/색·위치가 한눈에) */
-  body[data-panel-tab=text] .stage-inner{height:min(24vh,220px); padding:6px 10px 2px}
+  body[data-panel-tab=text] .stage-inner{height:min(32vh,300px); padding:6px 10px 2px}
   body[data-panel-tab=text] .timeline{height:auto}
-  body[data-panel-tab=text] .tools-panel{height:clamp(280px,55vh,452px); padding:9px 10px 10px; overscroll-behavior:contain}
+  body[data-panel-tab=text] .tools-panel{height:clamp(268px,50vh,430px); padding:9px 10px 10px; overscroll-behavior:contain}
   body[data-panel-tab=text] .tool-row{gap:8px; margin-bottom:8px}
   body[data-panel-tab=text] .tools-panel .pill{min-height:32px; padding:7px 11px; font-size:11.5px}
   body[data-panel-tab=text] .tt-area{height:94px; font-size:15px; padding:9px 11px; line-height:1.45}
@@ -931,6 +942,18 @@ function applyClipAudio(c) {
 function applyAllClipAudio() {
   for (const c of state.clips) if (c._el) { applyClipAudio(c); c._el.playbackRate = c.speed || 1; }
 }
+/* 원본 영상 소리 끄기 ↔ 켜기 (편집 탭 · 음악 탭이 같은 state.globalVideoMuted 를 본다) */
+function origMuteLabel() { return state.globalVideoMuted ? '🔊 원본 영상 소리 켜기' : '🔇 원본 영상 소리 끄기'; }
+function toggleOrigAudio(force) {
+  const next = (force == null) ? !state.globalVideoMuted : !!force;
+  if (next === state.globalVideoMuted) return state.globalVideoMuted;
+  state.globalVideoMuted = next;
+  applyAllClipAudio();
+  renderRight();
+  drawNow();
+  toast(next ? '🔇 원본 영상 소리를 껐어요 — 배경음악만 들려요' : '🔊 원본 영상 소리를 다시 켰어요', next ? 'ok' : 'ok');
+  return next;
+}
 function ensureAudioEl(a) {
   if (a._el && a._el.isConnected) { applyAudioItem(a); return a._el; }
   const asset = assets.get(a.assetId);
@@ -946,12 +969,161 @@ function ensureAudioEl(a) {
   return el;
 }
 function applyAudioItem(a) {
+  if (a._node) {                      // Web Audio 재생 중 — 게인만 바꾼다(재스케줄 없음)
+    try { a._node.gain.gain.value = musicGainValue(a); } catch (e) { }
+    return;
+  }
   const el = a._el;
   if (!el) return;
   el.volume = clamp((a.volume == null ? 0.8 : a.volume) * state.globalMusicVolume, 0, 1);
   el.muted = !!a.muted || state.globalMusicMuted;
 }
-function applyAllAudio() { for (const a of state.audios) if (a._el) applyAudioItem(a); }
+function applyAllAudio() { for (const a of state.audios) applyAudioItem(a); }
+
+/* ---------------- 음악 재생: Web Audio(AudioBufferSourceNode) ----------------
+   예전에는 <audio>.currentTime을 매 프레임 맞추는(seek) 방식이라 아이폰 사파리에서
+   <video>와 함께 재생할 때 소리가 심하게 끊겼다. 이제는
+     · 음악 파일을 넣을 때 AudioBuffer로 한 번만 디코딩해 캐시하고(asset._buf)
+     · 재생 시작·시크·트랙 편집 때만 start(0, offset, duration)로 스케줄하며
+     · 재생 중에는 currentTime을 절대 건드리지 않는다 → 끊김 없음
+   iOS 무음/잠금 정책은 재생 버튼 같은 사용자 터치 안에서 resume()으로 통과한다.
+   디코딩이 안 되는 형식일 때만 예전 <audio> 방식으로 자동 폴백한다. */
+let audioCtxMain = null;        // 앱 전체가 함께 쓰는 AudioContext (미리보기 + 내보내기)
+let audioBus = null;            // 음악 소리를 모으는 GainNode → 스피커
+let exportBusDest = null;       // 내보내기 중 MediaStreamDestination
+let musicScheduleCount = 0;     // (검증용) 실제 스케줄 횟수
+const mediaElSrc = new WeakMap();
+
+function ensureAudioCtx() {
+  if (audioCtxMain && audioCtxMain.state !== 'closed') return audioCtxMain;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try {
+    audioCtxMain = new AC();
+    audioBus = audioCtxMain.createGain();
+    audioBus.gain.value = 1;
+    audioBus.connect(audioCtxMain.destination);
+  } catch (e) { audioCtxMain = null; audioBus = null; }
+  return audioCtxMain;
+}
+function resumeAudioCtx() {            // 반드시 사용자 터치(재생 버튼 등) 안에서 부른다
+  const ctx = ensureAudioCtx();
+  if (!ctx || ctx.state === 'running') return;
+  try {
+    const p = ctx.resume();
+    if (p && typeof p.catch === 'function') p.catch(() => { });   // 제스처 밖 호출은 조용히 넘어간다
+  } catch (e) { }
+}
+function musicGainValue(a) {
+  if (!a) return 0;
+  if (a.muted || state.globalMusicMuted) return 0;
+  return clamp((a.volume == null ? 0.8 : a.volume) * state.globalMusicVolume, 0, 1);
+}
+function stopMusicNode(a) {
+  const n = a && a._node;
+  if (!n) return;
+  a._node = null;
+  try { n.src.stop(); } catch (e) { }
+  try { n.src.disconnect(); } catch (e) { }
+  try { n.gain.disconnect(); } catch (e) { }
+}
+function stopAllMusic() { for (const a of state.audios) stopMusicNode(a); }
+/* 음악 파일 → AudioBuffer (1회 디코딩 후 캐시) */
+function ensureAssetBuffer(asset) {
+  if (!asset) return Promise.reject(new Error('no-asset'));
+  if (asset._buf) return Promise.resolve(asset._buf);
+  if (asset._bufPromise) return asset._bufPromise;
+  asset._bufPromise = (async () => {
+    const ctx = ensureAudioCtx();
+    if (!ctx) throw new Error('no-audioctx');
+    let data = null;
+    if (asset.file && typeof asset.file.arrayBuffer === 'function') data = await asset.file.arrayBuffer();
+    else if (asset.url) { const res = await fetch(asset.url); data = await res.arrayBuffer(); }
+    if (!data || !data.byteLength) throw new Error('empty-file');
+    const buf = await new Promise((resolve, reject) => {
+      let done = false;
+      const ok = b => { if (!done) { done = true; if (b && b.length) resolve(b); else reject(new Error('decode-failed')); } };
+      const bad = er => { if (!done) { done = true; reject(er || new Error('decode-failed')); } };
+      try {
+        const p = ctx.decodeAudioData(data.slice(0), ok, bad);
+        if (p && typeof p.then === 'function') p.then(ok, bad);
+      } catch (er) { bad(er); }
+    });
+    asset._buf = buf;
+    return buf;
+  })().catch(err => {
+    asset._bufPromise = null;
+    asset._decodeFailed = true;
+    console.warn('음악 디코딩 실패 — <audio> 방식으로 재생합니다:', asset.name, err);
+    throw err;
+  });
+  return asset._bufPromise;
+}
+function primeAudioAsset(asset) {
+  if (!asset || asset.kind !== 'audio' || asset._buf || asset._bufPromise) return;
+  ensureAssetBuffer(asset).then(() => { if (state.playing) syncMusic(state.time); }).catch(() => { });
+}
+/* 지금 위치 t에서 한 번만 스케줄한다. 재생 중에는 다시 부르지 않는다. */
+function scheduleMusicNode(a, t) {
+  const asset = assets.get(a.assetId);
+  if (!asset) return false;
+  if (asset._decodeFailed) { a._legacy = true; return false; }
+  if (!asset._buf) { primeAudioAsset(asset); return false; }
+  const ctx = ensureAudioCtx();
+  if (!ctx || ctx.state !== 'running') return false;   // 아직 잠금 상태 — 다음 프레임에 재시도
+  stopMusicNode(a);
+  const rel = clamp(t - a.start, 0, a.duration);
+  const offset = (a.in || 0) + rel;
+  const dur = Math.min(Math.max(0, asset._buf.duration - offset), Math.max(0, a.duration - rel));
+  if (dur <= 0.02) return false;
+  const src = ctx.createBufferSource();
+  src.buffer = asset._buf;
+  const gain = ctx.createGain();
+  gain.gain.value = musicGainValue(a);
+  src.connect(gain);
+  gain.connect(audioBus);
+  try { src.start(0, offset, dur); } catch (e) { try { gain.disconnect(); } catch (er) { } return false; }
+  a._node = { src, gain, offset, dur, at: ctx.currentTime };
+  a._schedLog = (a._schedLog || []).concat([[+ctx.currentTime.toFixed(3), +t.toFixed(3)]]).slice(-12);
+  musicScheduleCount++;  return true;
+}
+/* 디코딩이 안 되는 형식만 쓰는 예전 방식 (currentTime 동기화) */
+function syncLegacyAudio(a, t) {
+  const el = ensureAudioEl(a);
+  if (!el) return;
+  const target = (a.in || 0) + clamp(t - a.start, 0, a.duration);
+  if (el.paused) { try { el.currentTime = target; } catch (e) { } playMedia(el); }
+  else if (!el.seeking && Math.abs(el.currentTime - target) > 0.4) { try { el.currentTime = target; } catch (e) { } }
+}
+function syncMusic(t) {
+  for (const a of state.audios) {
+    const inside = t >= a.start - 0.05 && t < a.start + a.duration - 0.02;
+    if (!inside) { stopMusicNode(a); if (a._el && !a._el.paused) { try { a._el.pause(); } catch (e) { } } continue; }
+    const asset = assets.get(a.assetId) || {};
+    if (a._legacy || asset._decodeFailed) { syncLegacyAudio(a, t); continue; }
+    if (a._node) continue;            // 이미 울리고 있다 — 재생 중 재스케줄 금지
+    scheduleMusicNode(a, t);
+  }
+}
+/* 검증용: 지금 음악 엔진이 어떤 상태인지 그대로 보여 준다 */
+function audioEngineInfo() {
+  const ctx = audioCtxMain;
+  return {
+    ctxState: ctx ? ctx.state : 'none',
+    sampleRate: ctx ? ctx.sampleRate : 0,
+    scheduleCount: musicScheduleCount,
+    tracks: state.audios.map(a => {
+      const asset = assets.get(a.assetId) || {};
+      return {
+        id: a.id, name: a.name, legacy: !!a._legacy, decodeFailed: !!asset._decodeFailed,
+        decoded: !!asset._buf, bufferDur: asset._buf ? asset._buf.duration : 0,
+        duration: a.duration, start: a.start, in: a.in,
+        sched: a._schedLog || [],
+        node: a._node ? { offset: a._node.offset, dur: a._node.dur, at: a._node.at, elapsed: ctx ? ctx.currentTime - a._node.at : 0, gain: a._node.gain.gain.value } : null
+      };
+    })
+  };
+}
 function playMedia(el) {
   const p = el.play();
   if (p && p.catch) p.catch(() => {
@@ -966,6 +1138,7 @@ function releaseMedia() {
     if (c._el) { try { c._el.pause(); } catch (e) { } c._el.removeAttribute('src'); c._el.load(); c._el.remove(); c._el = null; }
   }
   for (const a of state.audios) {
+    stopMusicNode(a);
     if (a._el) { try { a._el.pause(); } catch (e) { } a._el.removeAttribute('src'); a._el.load(); a._el.remove(); a._el = null; }
   }
   currentPlayingClip = null;
@@ -1288,69 +1461,119 @@ function drawFrame(g, W, H, t, withSelection) {
   if (withSelection) drawSelection(g, W, H);
   g.restore();
 }
+/* ---------------- 자막·이미지 선택 테두리와 손가락 핸들 -------------
+   핸들을 화면 크기(CSS px) 기준으로 그린다 — 아이폰에서도 손가락으로 잡기 쉽게.
+   · 모서리 4개: 크기 조절
+   · 테두리 위 큰 ↻ 하나: 사선 회전(-180°~180°)
+   · 히트 반경 24 CSS px (요구 기준 22px 이상) */
+const SEL_ROT_R_CSS = 13;      // 회전 핸들 반지름(CSS px) — 지름 26px
+const SEL_CORNER_R_CSS = 10;   // 모서리 핸들 반지름
+const SEL_HIT_CSS = 24;        // 손가락 히트 반경
+const SEL_GAP_CSS = 34;        // 테두리 위 → 회전 핸들 중심 거리
+
+function canvasCssScale() {
+  const r = canvas.getBoundingClientRect();
+  return (r && r.width > 1) ? canvas.width / r.width : 1;
+}
+function selGeometry(ov, W, H) {
+  const m = overlayMetrics(ctx, W, H, metricsSource(ov));
+  const sc = canvasCssScale();
+  const rad = (ov.rot || 0) * Math.PI / 180;
+  const cx = (ov.x == null ? 0.5 : ov.x) * W;
+  const cy = (ov.y == null ? 0.8 : ov.y) * H;
+  const at = (lx, ly) => ({ x: cx + lx * Math.cos(rad) - ly * Math.sin(rad), y: cy + lx * Math.sin(rad) + ly * Math.cos(rad) });
+  const corners = [
+    { type: 'nw', x: -m.w / 2, y: -m.h / 2 },
+    { type: 'ne', x: m.w / 2, y: -m.h / 2 },
+    { type: 'se', x: m.w / 2, y: m.h / 2 },
+    { type: 'sw', x: -m.w / 2, y: m.h / 2 }
+  ].map(c => Object.assign(c, at(c.x, c.y)));
+  const top = at(0, -m.h / 2);
+  const rp = at(0, -m.h / 2 - SEL_GAP_CSS * sc);
+  const pad = 16 * sc;   // 캔버스 밖으로 나가면 잡을 수 없으니 안으로 당긴다
+  const rot = { x: clamp(rp.x, pad, W - pad), y: clamp(rp.y, pad, H - pad) };
+  /* 화면(CSS px) 기준 박스 크기 — 작은 자막은 모서리 손잡이가 박스 전체를 덮어버리므로
+     크기 조절은 두 손가락(핀치)·크기 슬라이더에 맡기고, 모서리는 충분히 클 때만 잡힌다 */
+  const boxCssW = m.w / sc, boxCssH = m.h / sc;
+  const cornerHitCss = clamp(Math.min(SEL_HIT_CSS, Math.min(boxCssW, boxCssH) / 2.6), 10, SEL_HIT_CSS);
+  const cornerRcss = Math.min(SEL_CORNER_R_CSS, Math.max(3.5, Math.min(boxCssW, boxCssH) * 0.22));
+  return { m, sc, cx, cy, rad, corners, top, rot, boxCssW, boxCssH, cornerHitCss, cornerRcss,
+           scalable: boxCssW >= 54 && boxCssH >= 26 };
+}
 function drawSelection(g, W, H) {
   const ov = selectedOverlay();
   if (!ov) return;
   if (state.time < ov.start || state.time > ov.end) return;
-  const m = overlayMetrics(g, W, H, metricsSource(ov));
-  const k = W / 1080;
-  const cx = ov.x * W, cy = ov.y * H;
+  const geo = selGeometry(ov, W, H);
+  const m = geo.m, sc = geo.sc;
+  // 테두리
   g.save();
-  g.translate(cx, cy);
-  g.rotate((ov.rot || 0) * Math.PI / 180);
+  g.translate(geo.cx, geo.cy);
+  g.rotate(geo.rad);
   g.strokeStyle = '#a98dff';
-  g.lineWidth = Math.max(1.4, 2.2 * k);
-  g.setLineDash([9 * k, 7 * k]);
-  g.strokeRect(-m.w / 2 - 2 * k, -m.h / 2 - 2 * k, m.w + 4 * k, m.h + 4 * k);
+  g.lineWidth = Math.max(1.4, 2.2 * sc);
+  g.setLineDash([9 * sc, 7 * sc]);
+  g.strokeRect(-m.w / 2 - 2 * sc, -m.h / 2 - 2 * sc, m.w + 4 * sc, m.h + 4 * sc);
   g.setLineDash([]);
-  // rotate handle
-  g.beginPath();
-  g.moveTo(0, -m.h / 2);
-  g.lineTo(0, -m.h / 2 - 34 * k);
-  g.strokeStyle = 'rgba(169,141,255,.8)';
-  g.lineWidth = 1.6 * k;
-  g.stroke();
-  const pts = [
-    [-m.w / 2, -m.h / 2], [m.w / 2, -m.h / 2], [m.w / 2, m.h / 2], [-m.w / 2, m.h / 2], [0, -m.h / 2 - 34 * k]
-  ];
-  pts.forEach((p, i) => {
-    g.beginPath();
-    g.arc(p[0], p[1], (i === 4 ? 9 : 8) * k, 0, Math.PI * 2);
-    g.fillStyle = i === 4 ? '#ffd166' : '#ffffff';
-    g.fill();
-    g.lineWidth = 2 * k;
-    g.strokeStyle = i === 4 ? '#b9862a' : '#7c5cff';
-    g.stroke();
-  });
   g.restore();
+  // 회전 핸들로 이어지는 선
+  g.save();
+  g.strokeStyle = 'rgba(169,141,255,.85)';
+  g.lineWidth = Math.max(1.2, 1.8 * sc);
+  g.beginPath(); g.moveTo(geo.top.x, geo.top.y); g.lineTo(geo.rot.x, geo.rot.y); g.stroke();
+  g.restore();
+  // 모서리 핸들
+  const cr = geo.cornerRcss * sc;
+  for (const c of geo.corners) {
+    g.beginPath(); g.arc(c.x, c.y, cr, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(255,255,255,.96)'; g.fill();
+    g.lineWidth = Math.max(1.2, 1.8 * sc); g.strokeStyle = '#7c5cff'; g.stroke();
+  }
+  // 큰 회전(↻) 핸들
+  const r = SEL_ROT_R_CSS * sc;
+  g.beginPath(); g.arc(geo.rot.x, geo.rot.y, r, 0, Math.PI * 2);
+  g.fillStyle = '#ffd166'; g.fill();
+  g.lineWidth = Math.max(1.6, 2.4 * sc); g.strokeStyle = '#8a5f12'; g.stroke();
+  g.fillStyle = '#3a2a06';
+  g.font = `800 ${Math.round(15 * sc)}px system-ui,-apple-system,sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('↻', geo.rot.x, geo.rot.y + Math.max(0, 0.5 * sc));
+  // 각도 가이드 — 돌리는 중이거나 이미 기울어져 있으면 각도를 보여 준다
+  const turning = (typeof pointerOp !== 'undefined' && pointerOp && pointerOp.mode === 'rotate') ||
+                  (typeof ovGesture !== 'undefined' && ovGesture && ovGesture.ov === ov);
+  const deg = Math.round(ov.rot || 0);
+  if (turning || Math.abs(deg) > 0.4) {
+    const label = (deg > 0 ? '+' : '') + deg + '°';
+    g.font = `800 ${Math.round(12 * sc)}px system-ui,-apple-system,sans-serif`;
+    const tw = g.measureText(label).width + 14 * sc;
+    const th = 20 * sc;
+    let bx = geo.rot.x + r + 6 * sc;
+    if (bx + tw > W - 4 * sc) bx = geo.rot.x - r - 6 * sc - tw;
+    bx = clamp(bx, 4 * sc, W - tw - 4 * sc);
+    const by = clamp(geo.rot.y - th / 2, 4 * sc, H - th - 4 * sc);
+    roundRect(g, bx, by, tw, th, 6 * sc);
+    g.fillStyle = 'rgba(18,23,32,.94)'; g.fill();
+    g.strokeStyle = '#ffd166'; g.lineWidth = Math.max(1, 1.4 * sc); g.stroke();
+    g.fillStyle = '#ffe7bd'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(label, bx + tw / 2, by + th / 2 + 0.5 * sc);
+  }
 }
 function handlePoints(ov, W, H) {
-  const m = overlayMetrics(ctx, W, H, metricsSource(ov));
-  const k = W / 1080;
-  const rot = (ov.rot || 0) * Math.PI / 180;
-  const cx = ov.x * W, cy = ov.y * H;
-  const local = [
-    { x: -m.w / 2, y: -m.h / 2, type: 'nw' }, { x: m.w / 2, y: -m.h / 2, type: 'ne' },
-    { x: m.w / 2, y: m.h / 2, type: 'se' }, { x: -m.w / 2, y: m.h / 2, type: 'sw' },
-    { x: 0, y: -m.h / 2 - 34 * k, type: 'rot' }
-  ];
-  return local.map(p => ({
-    x: cx + p.x * Math.cos(rot) - p.y * Math.sin(rot),
-    y: cy + p.x * Math.sin(rot) + p.y * Math.cos(rot),
-    type: p.type
-  }));
+  const geo = selGeometry(ov, W, H);
+  return geo.corners.concat([{ x: geo.rot.x, y: geo.rot.y, type: 'rot' }]);
 }
 function hitOverlay(px, py) {
   const W = canvas.width, H = canvas.height;
+  const sc = canvasCssScale();
   for (let i = state.overlays.length - 1; i >= 0; i--) {
     const ov = state.overlays[i];
     if (state.time < ov.start || state.time > ov.end) continue;
     const m = overlayMetrics(ctx, W, H, metricsSource(ov));
     const rot = -(ov.rot || 0) * Math.PI / 180;
-    const dx = px - ov.x * W, dy = py - ov.y * H;
+    const dx = px - (ov.x == null ? 0.5 : ov.x) * W, dy = py - (ov.y == null ? 0.5 : ov.y) * H;
     const lx = dx * Math.cos(rot) - dy * Math.sin(rot);
     const ly = dx * Math.sin(rot) + dy * Math.cos(rot);
-    if (Math.abs(lx) <= m.w / 2 + 4 && Math.abs(ly) <= m.h / 2 + 4) return ov;
+    if (Math.abs(lx) <= m.w / 2 + 6 * sc && Math.abs(ly) <= m.h / 2 + 6 * sc) return ov;
   }
   return null;
 }
@@ -1363,6 +1586,7 @@ function setPlaying(v) {
   const btn = $('#btnPlay');
   btn.textContent = v ? '❚❚' : '▶';
   if (v) {
+    resumeAudioCtx();          // iOS 무음 정책: 재생 버튼 터치 안에서 깨운다
     for (const c of state.clips) if (c.kind === 'video') ensureVideoEl(c);
     syncPlayback();
   } else {
@@ -1372,6 +1596,7 @@ function setPlaying(v) {
 }
 function pauseAll() {
   for (const c of state.clips) if (c._el) c._el.pause();
+  stopAllMusic();
   for (const a of state.audios) if (a._el) a._el.pause();
   currentPlayingClip = null;
 }
@@ -1398,17 +1623,8 @@ function syncPlayback() {
       if (currentPlayingClip && currentPlayingClip._el) currentPlayingClip._el.pause();
       currentPlayingClip = c || null;
     }
-    // music
-    for (const a of state.audios) {
-      const el = ensureAudioEl(a);
-      if (!el) continue;
-      const inside = t >= a.start - 0.04 && t < a.start + a.duration - 0.02;
-      const target = (a.in || 0) + clamp(t - a.start, 0, a.duration);
-      if (inside) {
-        if (el.paused) { try { el.currentTime = target; } catch (e) { } playMedia(el); }
-        else if (!el.seeking && Math.abs(el.currentTime - target) > 0.4) { try { el.currentTime = target; } catch (e) { } }
-      } else if (!el.paused) el.pause();
-    }
+    // music — Web Audio 버퍼는 '한 번만' 스케줄한다 (매 프레임 currentTime 조정 없음)
+    syncMusic(t);
   } else {
     currentPlayingClip = null;
   }
@@ -1433,16 +1649,10 @@ function seekTo(t, keepPlaying) {
       if (state.playing) playMedia(v); else v.pause();
     }
   }
-  for (const a of state.audios) {
-    const el = ensureAudioEl(a);
-    if (!el) continue;
-    const inside = state.time >= a.start && state.time < a.start + a.duration;
-    const target = (a.in || 0) + clamp(state.time - a.start, 0, a.duration);
-    if (inside) {
-      try { if (!el.seeking) el.currentTime = target; } catch (e) { }
-      if (state.playing) playMedia(el); else el.pause();
-    } else el.pause();
-  }
+  // 음악도 새 위치에서 다시 스케줄 (시크는 재스케줄이 필요한 순간이다)
+  stopAllMusic();
+  for (const a of state.audios) if (a._el) { try { a._el.pause(); } catch (e) { } }
+  if (state.playing) syncMusic(state.time);
   drawNow();
   updateTimeUI();
 }
@@ -1737,6 +1947,7 @@ function addAudioAsset(asset, startAt) {
     muted: false
   };
   state.audios.push(item);
+  primeAudioAsset(asset);       // AudioBuffer로 미리 디코딩해 두면 재생이 바로 끊김 없이 시작된다
   return item;
 }
 
@@ -2249,7 +2460,7 @@ function deleteSelected(msg) {
     state.overlays = state.overlays.filter(o => o.id !== s.id);
   } else if (s.type === 'audio') {
     const a = audioById(s.id);
-    if (a && a._el) { try { a._el.pause(); } catch (e) { } a._el.remove(); a._el = null; }
+    if (a) { stopMusicNode(a); if (a._el) { try { a._el.pause(); } catch (e) { } a._el.remove(); a._el = null; } }
     state.audios = state.audios.filter(a => a.id !== s.id);
   }
   state.selected = null;
@@ -2522,7 +2733,8 @@ function editPanelHTML() {
       <span class="tool-label">정보</span>
       <span class="mini-note">원본 ${clipSourceLength(c).toFixed(1)}초 중 ${(c.inPoint || 0).toFixed(1)}–${((c.inPoint || 0) + c.duration * (c.speed || 1)).toFixed(1)}초 사용 · 배속 <b style="color:var(--gold)">${c.speed || 1}×</b> → 타임라인 ${Math.round(c.duration * 100) / 100}초 · 이 클립 소리 ${c.muted ? '음소거' : Math.round((c.volume == null ? 1 : c.volume) * 100) + '%'}</span>
       ${ctl('볼륨', rng('clip', 'volume', 0, 1, 0.02, c.volume == null ? 1 : c.volume) + valSpan(pct(c.volume == null ? 1 : c.volume)))}
-      <label class="chip" style="cursor:pointer"><input type="checkbox" data-clip="muted" ${c.muted ? 'checked' : ''} style="accent-color:var(--accent)"> 음소거</label>
+      <label class="chip" style="cursor:pointer"><input type="checkbox" data-clip="muted" ${c.muted ? 'checked' : ''} style="accent-color:var(--accent)"> 이 클립 음소거</label>
+      ${state.globalVideoMuted ? `<button class="pill orig-mute on" data-act="toggleOrigAudio" title="전체 원본 소리가 꺼져 있어요 — 누르면 다시 켭니다">🔊 전체 원본 소리 켜기</button>` : ''}
     </div>`
   ) : (
     `<div class="tool-row">
@@ -2542,6 +2754,7 @@ function editPanelHTML() {
     </div>
     <div class="tool-row">
       <span class="tool-label">전체</span>
+      <button class="pill orig-mute${state.globalVideoMuted ? ' on' : ''}" data-act="toggleOrigAudio" title="영상에 들어 있는 원래 소리를 한 번에 끄거나 켭니다">${origMuteLabel()}</button>
       <span class="mini-note">배속</span>
       <div class="speed-chips">${SPEED_STEPS.map(s => `<button data-act="bulkSpeed" data-speed="${s}" class="${Math.abs(bulkSpeed - s) < 0.001 ? 'on' : ''}">${s}×</button>`).join('')}</div>
       <button class="pill primary" data-act="applySpeedAll" title="고른 배속을 모든 영상 클립에 한 번에 적용">영상 전체 적용</button>
@@ -2563,7 +2776,7 @@ function textPanelHTML() {
         <button class="pill primary" data-act="addText">＋ 자막 추가</button>
         ${chips}
       </div>
-      <div class="tool-row"><span class="hint-inline">자막을 선택하면 내용·크기·색·배경·테두리·표시 시간을 조절할 수 있고, 미리보기에서 직접 끌어 위치를 옮길 수 있어요.</span></div>`;
+      <div class="tool-row"><span class="hint-inline">자막을 선택하면 내용·크기·색·배경·테두리·표시 시간을 조절할 수 있어요. 미리보기에서 자막을 <b>끌면 위치</b>가 움직이고, 테두리 위 <b>↻ 핸들을 끌면 비스듬히</b> 기울어져요 (두 손가락으로 돌리기·크기 조절도 됩니다).</span></div>`;
   }
   return `
     <div class="tool-row">
@@ -3132,6 +3345,7 @@ function musicPanelHTML() {
       <span class="tool-label" style="min-width:auto">전체</span>
       ${ctl('원본 영상', rng('global', 'video', 0, 1, 0.02, state.globalVideoVolume) + valSpan(pct(state.globalVideoVolume)))}
       <label class="chip chk mute-orig${state.globalVideoMuted ? ' on' : ''}" style="cursor:pointer" title="영상 원래 소리를 꺼서 배경음악만 들리게 합니다"><input type="checkbox" data-global="videoMute" ${state.globalVideoMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 🔇 원본 음소거</label>
+      <button class="pill orig-mute${state.globalVideoMuted ? ' on' : ''}" data-act="toggleOrigAudio" title="편집 탭과 같은 버튼 — 원본 영상 소리를 한 번에 끄거나 켭니다">${origMuteLabel()}</button>
       ${ctl('배경음악', rng('global', 'music', 0, 1, 0.02, state.globalMusicVolume) + valSpan(pct(state.globalMusicVolume)))}
       <label class="chip chk${state.globalMusicMuted ? ' on' : ''}" style="cursor:pointer"><input type="checkbox" data-global="musicMute" ${state.globalMusicMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 음악 음소거</label>
     </div>
@@ -3367,6 +3581,10 @@ function onGlobalInput(t) {
   if (p === 'music') state.globalMusicVolume = clamp(parseFloat(t.value), 0, 1);
   if (p === 'videoMute') state.globalVideoMuted = t.checked;
   if (p === 'musicMute') state.globalMusicMuted = t.checked;
+  if (p === 'videoMute') {
+    const ob = toolsPanel.querySelector('button[data-act=toggleOrigAudio]');
+    if (ob) { ob.textContent = origMuteLabel(); ob.classList.toggle('on', state.globalVideoMuted); }
+  }
   if (p === 'videoMute' || p === 'musicMute') { const lb = t.closest('label.chk'); if (lb) lb.classList.toggle('on', !!t.checked); }
   const valEl = t.parentElement.querySelector('.val');
   if (valEl && (p === 'video' || p === 'music')) valEl.textContent = pct(p === 'video' ? state.globalVideoVolume : state.globalMusicVolume);
@@ -3505,6 +3723,7 @@ toolsPanel.addEventListener('click', e => {
     layout(); state.time = clamp(state.time, 0, totalDuration()); renderAll();
     toast(pics.length + '장 사진을 ' + photoDefault + '초로 맞췄어요', 'ok');
   }
+  else if (act === 'toggleOrigAudio') toggleOrigAudio();
   else if (act === 'split') splitAtPlayhead();
   else if (act === 'clipLeft') moveSelectedClip(-1);
   else if (act === 'clipRight') moveSelectedClip(1);
@@ -3611,6 +3830,7 @@ function lpFire(st) {
   if (!a) return;
   tlDrag = null;                 // 진행 중이던 드래그·트림 기록은 버린다(중복 히스토리 방지)
   pushHistory();                 // 실행 취소로 되돌릴 수 있게
+  stopMusicNode(a);
   if (a._el) { try { a._el.pause(); } catch (e) { } a._el.remove(); a._el = null; }
   state.audios = state.audios.filter(x => x.id !== st.id);
   if (state.selected && state.selected.type === 'audio' && state.selected.id === st.id) state.selected = null;
@@ -3820,8 +4040,17 @@ window.addEventListener('pointerup', e => {
 });
 window.addEventListener('pointercancel', () => { lpCancel(); if (tlDrag && tlDrag.kind === 'scrub') { phStopScrub(); tlDrag = null; } });
 
-/* ---------------- preview canvas interactions ---------------- */
+/* ---------------- preview canvas interactions -------------
+   · 자막/이미지를 한 손가락으로 끌면 위치가 자유롭게 따라온다
+   · 선택 테두리의 큼직한 ↻ 핸들을 끌면 사선(-180°~180°)으로 기운다
+   · 두 손가락은 회전 + 크기(핀치)를 동시에
+   · 꾹 누르고 있어도 iOS 텍스트 선택·페이지 스크롤이 끼어들지 않는다 (touch-action:none)
+   · 재생 중에는 건드리지 않는다 */
 let pointerOp = null;
+let ovGesture = null;
+let canvasEmptyTap = false;   // 빈 곳을 눌렀을 때는 손을 떼야 선택을 풀어, 두 손가락으로 잡기 쉽게
+const canvasPtrs = new Map();
+
 function canvasPoint(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
@@ -3829,9 +4058,9 @@ function canvasPoint(e) {
 function startOvDrag(mode, ov, p, e) {
   pushHistory();
   const W = canvas.width, H = canvas.height;
-  const center = { x: ov.x * W, y: ov.y * H };
+  const center = { x: (ov.x == null ? 0.5 : ov.x) * W, y: (ov.y == null ? 0.5 : ov.y) * H };
   pointerOp = {
-    mode, ov, start: p, center,
+    mode, ov, start: p, center, pointerId: e.pointerId,
     startX: ov.x, startY: ov.y, startSize: ov.size, startWidth: ov.width, startRot: ov.rot || 0,
     startAngle: Math.atan2(p.y - center.y, p.x - center.x) * 180 / Math.PI,
     startDist: Math.hypot(p.x - center.x, p.y - center.y) || 1
@@ -3839,17 +4068,70 @@ function startOvDrag(mode, ov, p, e) {
   try { canvas.setPointerCapture(e.pointerId); } catch (err) { }
   canvas.classList.add('dragging');
 }
+/* 두 손가락: 회전 + 핀치 크기 + 중심 이동 */
+function beginOvGesture(ov) {
+  const pts = Array.from(canvasPtrs.values());
+  if (pts.length < 2 || !ov) return;
+  if (!pointerOp) pushHistory();          // 한 손가락 드래그가 이미 히스토리를 남겼으면 중복하지 않는다
+  const a = pts[0], b = pts[1];
+  ovGesture = {
+    ov, W: canvas.width, H: canvas.height,
+    startDist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+    startAng: Math.atan2(b.y - a.y, b.x - a.x),
+    mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+    startRot: ov.rot || 0, startSize: ov.size, startWidth: ov.width,
+    startX: ov.x == null ? 0.5 : ov.x, startY: ov.y == null ? 0.8 : ov.y
+  };
+  pointerOp = null;                        // 한 손가락 조작은 접는다
+  canvas.classList.add('dragging');
+}
+function updateOvGesture() {
+  const g = ovGesture;
+  if (!g) return;
+  const pts = Array.from(canvasPtrs.values());
+  if (pts.length < 2) return;
+  const a = pts[0], b = pts[1], ov = g.ov;
+  const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  let rot = g.startRot + (ang - g.startAng) * 180 / Math.PI;
+  rot = ((rot + 180) % 360 + 360) % 360 - 180;
+  ov.rot = Math.round(rot * 10) / 10;
+  const f = clamp(dist / g.startDist, 0.2, 5);
+  if (ov.kind === 'text') ov.size = clamp((g.startSize || 56) * f, 12, 220);
+  else ov.width = clamp((g.startWidth || 0.3) * f, 0.03, 1.6);
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  ov.x = clamp(g.startX + (mid.x - g.mid.x) / g.W, -0.2, 1.2);
+  ov.y = clamp(g.startY + (mid.y - g.mid.y) / g.H, -0.2, 1.2);
+  drawNow();
+}
 canvas.addEventListener('pointerdown', e => {
   if (exporting) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();                    // iOS 텍스트 선택·스크롤 차단
   const p = canvasPoint(e);
-  const ov = selectedOverlay();
-  if (ov && state.time >= ov.start && state.time <= ov.end) {
-    const hs = handlePoints(ov, canvas.width, canvas.height);
-    const thresh = Math.max(14, 22 * canvas.width / 540);
-    for (const h of hs) {
-      if (Math.hypot(p.x - h.x, p.y - h.y) <= thresh) {
-        startOvDrag(h.type === 'rot' ? 'rotate' : 'scale', ov, p, e);
-        return;
+  canvasPtrs.set(e.pointerId, p);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { }
+
+  if (canvasPtrs.size === 2) {
+    canvasEmptyTap = false;
+    let ov = (pointerOp && pointerOp.ov) || selectedOverlay() || hitOverlay(p.x, p.y);
+    if (ov) {
+      if (!state.selected || state.selected.id !== ov.id) selectOverlay(ov.id);
+      beginOvGesture(ov);
+    }
+    return;
+  }
+  if (canvasPtrs.size > 2) return;
+
+  const sel = selectedOverlay();
+  if (sel && state.time >= sel.start && state.time <= sel.end) {
+    const geo = selGeometry(sel, canvas.width, canvas.height);
+    const hitR = SEL_HIT_CSS * geo.sc;      // 24 CSS px — 손가락으로 잡기 쉬운 반경
+    if (Math.hypot(p.x - geo.rot.x, p.y - geo.rot.y) <= hitR) { startOvDrag('rotate', sel, p, e); return; }
+    if (geo.scalable) {
+      const hc = geo.cornerHitCss * geo.sc;
+      for (const c of geo.corners) {
+        if (Math.hypot(p.x - c.x, p.y - c.y) <= hc) { startOvDrag('scale', sel, p, e); return; }
       }
     }
   }
@@ -3858,18 +4140,26 @@ canvas.addEventListener('pointerdown', e => {
     if (!state.selected || state.selected.id !== hit.id) selectOverlay(hit.id);
     startOvDrag('move', hit, p, e);
   } else {
-    state.selected = null;
-    renderRight(); renderTimeline(); drawNow();
+    canvasEmptyTap = true;      // 지금 풀지 않고, 손을 뗐는데 아무것도 안 잡혔을 때만 선택 해제
   }
 });
 window.addEventListener('pointermove', e => {
+  if (canvasPtrs.has(e.pointerId)) canvasPtrs.set(e.pointerId, canvasPoint(e));
+  if (ovGesture) { updateOvGesture(); return; }
   if (!pointerOp) {
     if (e.target === canvas) {
       const p = canvasPoint(e);
-      canvas.style.cursor = hitOverlay(p.x, p.y) ? 'grab' : 'default';
+      const sel = selectedOverlay();
+      let cur = hitOverlay(p.x, p.y) ? 'grab' : 'default';
+      if (sel) {
+        const geo = selGeometry(sel, canvas.width, canvas.height);
+        if (Math.hypot(p.x - geo.rot.x, p.y - geo.rot.y) <= SEL_HIT_CSS * geo.sc) cur = 'crosshair';
+      }
+      canvas.style.cursor = cur;
     }
     return;
   }
+  if (pointerOp.pointerId != null && e.pointerId !== pointerOp.pointerId) return;
   const p = canvasPoint(e), W = canvas.width, H = canvas.height;
   const { mode, ov } = pointerOp;
   if (mode === 'move') {
@@ -3884,20 +4174,41 @@ window.addEventListener('pointermove', e => {
     const a = Math.atan2(p.y - pointerOp.center.y, p.x - pointerOp.center.x) * 180 / Math.PI;
     let rot = pointerOp.startRot + (a - pointerOp.startAngle);
     if (e.shiftKey) rot = Math.round(rot / 15) * 15;
+    rot = ((rot + 180) % 360 + 360) % 360 - 180;
     ov.rot = Math.round(rot * 10) / 10;
   }
   drawNow();
 });
-function endOvDrag() {
-  if (!pointerOp) return;
+function endOvDrag(e) {
+  if (e && e.pointerId != null) canvasPtrs.delete(e.pointerId);
+  if (ovGesture) {
+    if (canvasPtrs.size >= 2) return;
+    ovGesture = null;
+    canvasEmptyTap = false;
+  }
+  if (!pointerOp) {
+    canvas.classList.remove('dragging');
+    if (canvasEmptyTap && canvasPtrs.size === 0) {
+      canvasEmptyTap = false;
+      if (state.selected) { state.selected = null; renderRight(); renderTimeline(); drawNow(); }
+    }
+    return;
+  }
   pointerOp = null;
   canvas.classList.remove('dragging');
+  canvasEmptyTap = false;
   renderRight();
   renderTimeline();
   drawNow();
 }
 window.addEventListener('pointerup', endOvDrag);
-window.addEventListener('pointercancel', endOvDrag);
+window.addEventListener('pointercancel', e => {
+  canvasPtrs.clear();
+  ovGesture = null;
+  canvasEmptyTap = false;
+  canvas.classList.remove('dragging');
+  if (pointerOp) { pointerOp = null; renderRight(); renderTimeline(); drawNow(); }
+});
 canvas.addEventListener('dblclick', e => {
   const p = canvasPoint(e);
   const hit = hitOverlay(p.x, p.y);
@@ -4072,28 +4383,24 @@ function mimeSupported(c) {
 }
 function ensureExportAudio() {
   try {
-    if (!exportGraph || exportGraph.ctx.state === 'closed') {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return Promise.resolve(null);
-      const actx = new AC();
-      const dest = actx.createMediaStreamDestination();
-      const master = actx.createGain();
-      master.gain.value = 1;
-      master.connect(actx.destination);
-      master.connect(dest);
-      exportGraph = { ctx: actx, dest, master, connected: new WeakSet() };
-    }
-    return Promise.resolve(exportGraph.ctx.resume().catch(() => { })).then(() => exportGraph);
+    const ctx = ensureAudioCtx();
+    if (!ctx) return Promise.resolve(null);
+    if (!exportBusDest) exportBusDest = ctx.createMediaStreamDestination();
+    try { audioBus.connect(exportBusDest); } catch (e) { }   // 음악 그래프를 녹화 트랙으로
+    exportGraph = { ctx, dest: exportBusDest, master: audioBus, connected: new WeakSet() };
+    return Promise.resolve(ctx.resume().catch(() => { })).then(() => exportGraph);
   } catch (e) { return Promise.resolve(null); }
 }
 function connectMediaEl(el) {
-  const g = exportGraph;
-  if (!g || !el || g.connected.has(el)) return;
-  try {
-    const src = g.ctx.createMediaElementSource(el);
-    src.connect(g.master);
-    g.connected.add(el);
-  } catch (e) { }
+  if (!el) return;
+  const ctx = ensureAudioCtx();
+  if (!ctx) return;
+  let src = mediaElSrc.get(el);
+  if (!src) {
+    try { src = ctx.createMediaElementSource(el); } catch (e) { return; }
+    mediaElSrc.set(el, src);
+  }
+  try { src.connect(audioBus); } catch (e) { }
 }
 function pickMime() {
   const h264 = [
@@ -4272,6 +4579,7 @@ async function startExport() {
   try { rec.stop(); } catch (e) { }
   await stopped;
   exporting = false;
+  try { if (audioBus && exportBusDest) audioBus.disconnect(exportBusDest); } catch (e) { }
 
   if (!finished || exportCancelled) {
     state.time = 0; seekTo(0);
@@ -4345,7 +4653,7 @@ function boot() {
   loadUsedFonts().then(() => { drawNow(); if (tab === 'text') renderRight(); });
   window.__editor = {
     state, assets, totalDuration, seekTo, renderAll, loadSample, splitAtPlayhead,
-    handlePoints, hitOverlay, overlayMetrics, canvas, FONTS, fontDef, fontStack, loadFont,
+    handlePoints, hitOverlay, selGeometry, canvasCssScale, overlayMetrics, canvas, FONTS, fontDef, fontStack, loadFont,
     drawFrame, drawOverlay, metricsSource, insertTextEmoji, TEXT_EMOJIS,
     clipById, addClipFromAsset, setClipDuration, clipMaxDuration, ensureSticker,
     bgm: { presets: BGM_PRESETS, build: bgmBuild, add: addBgmPreset,
@@ -4354,6 +4662,9 @@ function boot() {
     setBulkSpeed: v => { bulkSpeed = v; },
     setPhotoDefault: v => { photoDefault = v; },
     extract: { fromFile: extractAudioFromVideoFile, fromClip: splitClipAudio, busy: () => extractBusy },
+    audio: { info: audioEngineInfo, ctx: () => audioCtxMain, bus: () => audioBus, resume: resumeAudioCtx,
+             decode: id => { const a = assets.get(id); return a ? ensureAssetBuffer(a) : Promise.reject(new Error('no-asset')); } },
+    origAudio: { muted: () => state.globalVideoMuted, toggle: v => toggleOrigAudio(v) },
     historyInfo: () => ({ past: history.past.length, future: history.future.length })
   };
 }
