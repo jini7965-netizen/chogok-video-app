@@ -266,10 +266,33 @@ body.ph-dragging{cursor:ew-resize}
 .tools-panel::-webkit-scrollbar{width:8px}
 .tools-panel::-webkit-scrollbar-thumb{background:#2a3244; border-radius:9px}
 .tools-panel.collapsed{height:0; padding-top:0; padding-bottom:0; overflow:hidden}
+/* 탭별 고정 높이(body[data-panel-tab] .tools-panel)가 접힘을 이기지 않도록 같은 무게로 다시 지정 */
+body[data-panel-tab=text] .tools-panel.collapsed, body[data-panel-tab=music] .tools-panel.collapsed,
+body[data-panel-tab=image] .tools-panel.collapsed{height:0; padding-top:0; padding-bottom:0}
 /* 자막·음악·이미지 탭은 도구가 많아 데스크톱에서도 높이를 조금 넓힌다 (모바일 높이는 아래 미디어쿼리에서 다시 정함) */
 body[data-panel-tab=text] .tools-panel{height:200px}
 body[data-panel-tab=music] .tools-panel,
 body[data-panel-tab=image] .tools-panel{height:170px}
+/* 탭마다 맨 위에 붙는 ✓ 확인 줄 — 패널을 스크롤해도 항상 보인다(아이폰에서 자막 🗑 삭제가 가려지지 않게) */
+.panel-actions{
+  position:sticky; top:0; z-index:7; display:flex; align-items:center; gap:7px;
+  margin:0 -16px 8px; padding:9px 16px 8px;
+  background:#151a24;
+  border-bottom:1px solid rgba(139,108,255,.28);
+  box-shadow:0 6px 14px rgba(0,0,0,.35);
+}
+/* 확인 줄이 있는 탭은 패널 위쪽 여백을 없애 줄이 패널 맨 위에 딱 붙어 고정되게 한다 */
+.tools-panel.has-actions, body[data-panel-tab=text] .tools-panel.has-actions,
+body[data-panel-tab=music] .tools-panel.has-actions, body[data-panel-tab=image] .tools-panel.has-actions{padding-top:0}
+.panel-actions .pill{min-height:30px; padding:5px 12px; font-size:11.5px}
+.panel-actions .pill.ok{padding:5px 16px; font-size:12.5px}
+.panel-actions .hint-inline{font-size:10.5px; color:#8b96ac; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+.pill.ok{
+  background:linear-gradient(135deg,#2fd39a,#12a274); border-color:#4ce3b4; color:#04241a;
+  font-weight:800; box-shadow:0 4px 14px rgba(18,162,116,.28);
+}
+.pill.ok:hover{background:linear-gradient(135deg,#44e6ad,#17b884); color:#04241a}
+.pill.ok.on{background:linear-gradient(135deg,#2fd39a,#12a274); color:#04241a}
 .tool-row{display:flex; align-items:center; gap:7px; margin-bottom:7px; flex-wrap:wrap; min-height:26px}
 .tool-row:last-child{margin-bottom:0}
 .tool-label{font-size:9.5px; font-weight:700; color:var(--muted); letter-spacing:.5px; min-width:40px; flex:0 0 auto; text-transform:uppercase}
@@ -495,6 +518,15 @@ label.chip.chk.mute-track.on{border-color:#ff8fa3; background:#3a1720; color:#ff
   .tl-labels{flex:0 0 56px; padding:0 4px 4px; font-size:8.5px}
   .tl-labels>div{padding-left:2px}
   .tools-panel{height:146px; flex:0 0 auto; padding:8px 10px 6px}
+  /* 도구 패널을 접으면(✓ 확인 후) 남는 세로 공간을 타임라인이 채운다 */
+  body.tools-folded .timeline:not(.tl-collapsed){flex:1 1 auto; height:auto; min-height:172px}
+  body.tools-folded .toolbox{flex:0 0 auto}
+  .panel-actions{margin:0 -10px 7px; padding:8px 10px 7px; gap:6px}
+  .tools-panel.has-actions, body[data-panel-tab=text] .tools-panel.has-actions,
+  body[data-panel-tab=music] .tools-panel.has-actions, body[data-panel-tab=image] .tools-panel.has-actions{padding-top:0}
+  .panel-actions .pill{min-height:30px; padding:5px 10px; font-size:11.5px}
+  .panel-actions .pill.ok{padding:5px 15px; font-size:12.5px}
+  .panel-actions .hint-inline{display:none}
   .tool-row{gap:5px; margin-bottom:6px}
   .tool-label{min-width:34px}
   .tt-area{flex:1 1 100%; min-width:0}
@@ -577,6 +609,35 @@ label.chip.chk.mute-track.on{border-color:#ff8fa3; background:#3a1720; color:#ff
 .clip-handle.left{left:0; border-radius:5px 0 0 5px}
 .clip-handle.right{right:0; border-radius:0 5px 5px 0}
 .clip-handle:active{background:linear-gradient(180deg,#a98dff,#7ff0d2)}
+/* ---------- 자막·음악 블록 길이 조절(트리밍) 손잡이 ----------
+   블록을 톡 쳐서 고르면 양옆에 노란 손잡이가 나타나고, 손가락으로 끌면
+   자막은 시작·끝 시간, 음악은 시작점·길이가 바뀐다. 블록 본체 드래그(옮기기)·
+   꾹 누르기(음악 삭제)와는 손잡이 영역에서 완전히 분리된다. */
+.ov-block.sel, .audio-block.sel{overflow:visible}
+.ov-block b{min-width:0}
+.audio-block span{min-width:0; flex:1 1 auto}
+.trim-handle{
+  position:absolute; top:-9px; bottom:-9px; width:20px; z-index:8;
+  display:flex; align-items:center; justify-content:center;
+  touch-action:none; cursor:ew-resize;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+}
+.trim-handle:before{
+  content:""; width:7px; height:24px; border-radius:4px;
+  background:linear-gradient(180deg,#ffe08a,#ffc63d);
+  box-shadow:0 0 0 1.5px rgba(9,12,18,.85), 0 2px 7px rgba(0,0,0,.55);
+}
+.trim-handle:after{content:""; position:absolute; inset:-5px -4px}
+.trim-handle.left{left:-10px}
+.trim-handle.right{right:-10px}
+/* 아주 짧은 블록: 손잡이를 좁혀서 가운데 본체(옮기기) 공간을 남긴다 */
+.ov-block.narrow .trim-handle, .audio-block.narrow .trim-handle{width:13px}
+.ov-block.narrow .trim-handle:before, .audio-block.narrow .trim-handle:before{width:5px; height:20px}
+.ov-block.narrow .trim-handle.left, .audio-block.narrow .trim-handle.left{left:-6px}
+.ov-block.narrow .trim-handle.right, .audio-block.narrow .trim-handle.right{right:-6px}
+.trim-handle:active:before{background:linear-gradient(180deg,#fff3c4,#ffb020)}
+body.trm-dragging{cursor:ew-resize}
+body.trm-dragging .ov-block, body.trm-dragging .audio-block{transition:none}
 .tl-tip{
   position:fixed; z-index:99; padding:4px 9px; border-radius:8px; pointer-events:none;
   background:rgba(18,23,32,.96); border:1px solid #8b6cff; color:#fff;
@@ -2577,6 +2638,17 @@ const trackAudio = $('#trackAudio');
 
 const pct = v => Math.round((Number(v) || 0) * 100) + '%';
 const sec = v => (Math.round((Number(v) || 0) * 100) / 100) + '초';
+/* 슬라이더·숫자칸 옆 값 표시 — v7까지 이름만 있고 정의가 없어
+   자막 슬라이더를 움직이면 오류가 나고 미리보기가 갱신되지 않았다 */
+function formatVal(p, v, unit) {
+  const n = Number(v) || 0;
+  if (p === 'size') return Math.round(n) + 'px';
+  if (p === 'borderWidth') return n + 'px';
+  if (p === 'rot') return Math.round(n) + '°';
+  if (p === 'width' || p === 'bgOpacity' || p === 'opacity' || p === 'x' || p === 'y') return pct(n);
+  if (unit === 'sec' || p === 'start' || p === 'end') return sec(n);
+  return String(v);
+}
 
 /* ---------------- selection ---------------- */
 function selectClip(id) {
@@ -2584,11 +2656,13 @@ function selectClip(id) {
   tab = 'edit';
   renderRight(); renderTimeline(); drawNow();
 }
-function selectOverlay(id) {
+function selectOverlay(id, keepTimeline) {
   const ov = id ? overlayById(id) : null;
   state.selected = id ? { type: 'overlay', id } : null;
   tab = ov ? (ov.kind === 'text' ? 'text' : 'image') : 'edit';
+  if (keepTimeline) tlKeepTimeline = true;   // 타임라인에서 직접 골랐으면 타임라인은 펼친 채로 둔다
   renderRight(); renderTimeline(); drawNow();
+  tlKeepTimeline = false;
 }
 function selectAudio(id, keepTab) {
   state.selected = { type: 'audio', id };
@@ -2658,9 +2732,12 @@ function renderTimeline() {
     const w = Math.max(18, (o.end - o.start) * zoom);
     const sel = state.selected && state.selected.type === 'overlay' && state.selected.id === o.id;
     const label = o.kind === 'text' ? (o.text || '자막').replace(/\n/g, ' ') : ((assets.get(o.assetId) || {}).name || '이미지');
-    return `<div class="ov-block${o.kind === 'image' ? ' img' : ''}${sel ? ' sel' : ''}" data-id="${o.id}"
+    // 선택하면 양끝에 길이 조절 손잡이 — 끌어서 시작·끝 시간을 늘리거나 줄인다
+    const handles = sel ? `<span class="trim-handle left" data-ovtrim="left" data-id="${o.id}" title="끌어서 시작 시간 조절"></span><span class="trim-handle right" data-ovtrim="right" data-id="${o.id}" title="끌어서 끝 시간(길이) 조절"></span>` : '';
+    const narrow = (Math.max(16, w - 2) < 52) ? ' narrow' : '';
+    return `<div class="ov-block${o.kind === 'image' ? ' img' : ''}${sel ? ' sel' : ''}${narrow}" data-id="${o.id}"
         style="left:${left.toFixed(1)}px;width:${Math.max(16, w - 2).toFixed(1)}px;top:${LANE_TOP + lane * (LANE_H + 1)}px" title="${fmtTime(o.start)} ~ ${fmtTime(o.end)}">
-        <span class="ico">${o.kind === 'text' ? 'T' : '★'}</span><b>${esc(label)}</b>
+        <span class="ico">${o.kind === 'text' ? 'T' : '★'}</span><b>${esc(label)}</b>${handles}
       </div>`;
   }).join('') + (state.overlays.length ? '' : `<div class="track-empty">＋ 자막 · ★ 스티커로 얹어 보세요</div>`);
 
@@ -2669,9 +2746,11 @@ function renderTimeline() {
     const left = a.start * zoom;
     const w = Math.max(20, a.duration * zoom);
     const sel = state.selected && state.selected.type === 'audio' && state.selected.id === a.id;
-    return `<div class="audio-block${sel ? ' sel' : ''}" data-id="${a.id}" title="${esc(a.name)} · ${fmtTime(a.duration)} — 꼭 누르면 삭제"
+    const handles = sel ? `<span class="trim-handle left" data-autrim="left" data-id="${a.id}" title="끌어서 시작점 조절"></span><span class="trim-handle right" data-autrim="right" data-id="${a.id}" title="끌어서 길이 조절"></span>` : '';
+    const narrow = (Math.max(18, w - 2) < 52) ? ' narrow' : '';
+    return `<div class="audio-block${sel ? ' sel' : ''}${narrow}" data-id="${a.id}" title="${esc(a.name)} · ${fmtTime(a.duration)} — 꼭 누르면 삭제, 톡 치면 양끝 손잡이로 길이 조절"
         style="left:${left.toFixed(1)}px;width:${Math.max(18, w - 2).toFixed(1)}px">
-        <span class="ico">♪</span><span>${esc(a.name || '음악')}</span><b class="au-del" aria-hidden="true">🗑</b>
+        <span class="ico">♪</span><span>${esc(a.name || '음악')}</span><b class="au-del" aria-hidden="true">🗑</b>${handles}
       </div>`;
   }).join('') + (state.audios.length ? '' : `<div class="track-empty">♪ 음악 추가로 배경음악을 넣어 보세요</div>`);
 
@@ -2691,6 +2770,19 @@ function num(kind, prop, min, max, step, value, id) {
   return `<input type="number" data-${kind}="${prop}"${id ? ` data-id="${id}"` : ''} min="${min}" max="${max}" step="${step}" value="${value}">`;
 }
 function valSpan(text) { return `<span class="val">${text}</span>`; }
+/* 탭 맨 위에 붙는 ✓ 확인 줄 — 패널이 스크롤되어도 늘 손 닿는 자리에 있다 */
+function panelActionsHTML(kind) {
+  const ov = kind === 'text' ? selectedOverlay() : null;
+  const canDel = ov && ov.kind === 'text';
+  const hint = kind === 'text' ? '자막 편집을 마치면 확인'
+    : kind === 'music' ? '음악 설정을 마치면 확인'
+      : '편집을 마치면 확인 — 선택이 풀리고 타임라인으로 돌아가요';
+  return `<div class="panel-actions" data-actions="${kind}">
+    <button type="button" class="pill ok" data-act="confirmTab" title="지금 편집·선택을 확정하고 타임라인 확인 상태로 돌아갑니다">✓ 확인</button>
+    ${canDel ? `<button type="button" class="pill warn" data-act="del" title="선택한 자막 삭제">🗑 삭제</button>` : ''}
+    <span class="hint-inline">${hint}</span>
+  </div>`;
+}
 function speedButtons(clip) {
   return `<div class="speed-chips">${SPEED_STEPS.map(s =>
     `<button data-act="speed" data-speed="${s}" class="${Math.abs((clip.speed || 1) - s) < 0.001 ? 'on' : ''}">${s}×</button>`).join('')}</div>`;
@@ -2745,6 +2837,7 @@ function editPanelHTML() {
     </div>`
   );
   return `
+    ${panelActionsHTML('edit')}
     <div class="tool-row">
       <span class="tool-label">미디어</span>
       <button class="pill primary" data-act="pickImages" title="사진첩에서 여러 장을 한 번에 고르기">＋ 사진 여러 장</button>
@@ -2772,13 +2865,15 @@ function textPanelHTML() {
     ? `<div class="chip-strip">${texts.map(overlayChip).join('')}</div>`
     : `<span class="hint-inline">아직 자막이 없어요. ＋ 자막으로 첫 자막을 넣어 보세요.</span>`;
   if (!ov) {
-    return `<div class="tool-row">
+    return `${panelActionsHTML('text')}
+      <div class="tool-row">
         <button class="pill primary" data-act="addText">＋ 자막 추가</button>
         ${chips}
       </div>
       <div class="tool-row"><span class="hint-inline">자막을 선택하면 내용·크기·색·배경·테두리·표시 시간을 조절할 수 있어요. 미리보기에서 자막을 <b>끌면 위치</b>가 움직이고, 테두리 위 <b>↻ 핸들을 끌면 비스듬히</b> 기울어져요 (두 손가락으로 돌리기·크기 조절도 됩니다).</span></div>`;
   }
   return `
+    ${panelActionsHTML('text')}
     <div class="tool-row">
       <button class="pill primary" data-act="addText">＋ 자막 추가</button>
       ${chips}
@@ -2805,6 +2900,13 @@ function textPanelHTML() {
       ${ctl('글자색', `<input type="color" data-ov="color" value="${ov.color}">`)}
       ${ctl('배경', `<input type="color" data-ov="bg" value="${ov.bg}">` + rng('ov', 'bgOpacity', 0, 1, 0.02, ov.bgOpacity) + valSpan(pct(ov.bgOpacity)))}
       ${ctl('테두리', `<input type="color" data-ov="borderColor" value="${ov.borderColor}">` + rng('ov', 'borderWidth', 0, 14, 0.5, ov.borderWidth) + valSpan(ov.borderWidth + 'px'))}
+    </div>
+    <div class="tool-row">
+      <span class="tool-label">스타일</span>
+      <button type="button" class="pill sty-border${(ov.borderWidth || 0) <= 0.001 ? ' on' : ''}" data-act="strokeNone" title="글자 외곽선(테두리)을 완전히 없엄니다 — 한 번 더 누르면 되살아나요">테두리 없음</button>
+      <button type="button" class="pill sty-bg${(ov.bgOpacity || 0) <= 0.001 ? ' on' : ''}" data-act="bgNone" title="자막 뒤 배경 박스를 투명하게 — 한 번 더 누르면 되살아나요">배경 투명</button>
+      <label class="chip" style="cursor:pointer"><input type="checkbox" data-ov="shadow" ${ov.shadow ? 'checked' : ''} style="accent-color:var(--accent)"> 그림자</label>
+      <span class="hint-inline">테두리·배경을 모두 없애면 글자만 깔끔하게 남아요 (미리보기와 내보내기 동일)</span>
     </div>
     <div class="tool-row">
       ${ctl('가로', rng('ov', 'x', 0, 1, 0.005, ov.x) + valSpan(pct(ov.x)))}
@@ -3333,6 +3435,7 @@ function musicPanelHTML() {
   /* 위에서부터: 지금 깔린 음악(곡별 🗑 삭제) → 음악 넣기 → 전체 설정 → BGM 보관함.
      아이폰에서 탭을 열자마자 각 곡의 🗑 삭제가 보이도록 곡 줄을 맨 위에 둔다. */
   return `
+    ${panelActionsHTML('music')}
     ${rows || `<div class="tool-row"><span class="hint-inline">아직 음악이 없어요. 음악 파일을 올려 배경음악을 깔아 보세요.</span></div>`}
     <div class="tool-row">
       <button class="pill primary" data-act="pickAudio">＋ 음악 파일</button>
@@ -3396,6 +3499,7 @@ function renderRight() {
   else if (tab === 'ratio') html = ratioPanelHTML();
   else html = editPanelHTML();
   box.innerHTML = html;
+  box.classList.toggle('has-actions', html.indexOf('panel-actions') >= 0);   // 위쪽 여백을 없애 ✓ 확인 줄을 패널 맨 위에 붙인다
   if (inspectorFocusPending) {
     const ta = $('#ovText');
     if (ta) setTimeout(() => { ta.focus(); ta.select(); }, 30);
@@ -3516,6 +3620,7 @@ function onOverlayInput(t) {
     : (t.type === 'range' || t.type === 'number') ? parseFloat(t.value) : t.value;
   if (typeof v === 'number' && isNaN(v)) return;
   applyOverlayProp(ov, p, v);
+  if (p === 'borderWidth' || p === 'bgOpacity') syncOvStyleUI(ov);   // 슬라이더로 0이 되면 [테두리 없음]·[배경 투명]이 켜진다
   const valEl = t.parentElement.querySelector('.val');
   if (valEl && typeof v === 'number') valEl.textContent = formatVal(p, ov[p], p === 'start' || p === 'end' ? 'sec' : '');
   updateOverlayBlockEl(ov);
@@ -3640,6 +3745,79 @@ function applyRatio(k) {
   toast(RATIOS[k].label + ' 비율로 바꿨어요');
 }
 
+/* ---------------- ✓ 확인 — 탭별 편집 확정 ----------------
+   지금까지의 편집·선택을 확정하고, 선택을 풀어 [타임라인 확인 상태]로 돌아간다.
+   아이폰처럼 화면이 좁을 때는 도구 패널을 접고 타임라인을 펼쳐 결과를 바로 보여 준다. */
+function flushEditSnapshot() {
+  if (!editSnapshot) return;
+  if (editSnapshot !== snapshot()) {
+    history.past.push(editSnapshot); history.future.length = 0;
+    if (history.past.length > 80) history.past.shift();
+    updateHistoryButtons();
+  }
+  editSnapshot = null;
+}
+function foldToTimelineView() {
+  if (!isNarrowScreen()) return;
+  setTlCollapsed(false);     // 타임라인을 펼쳐 확인할 수 있게
+  toggleTools(true);         // 도구 패널은 접는다(탭을 누르면 다시 열림)
+}
+function confirmTab() {
+  const active = document.activeElement;
+  if (active && toolsPanel.contains(active) && typeof active.blur === 'function') active.blur();
+  flushEditSnapshot();
+  if (tab === 'text') {
+    const ov = selectedOverlay();
+    if (!ov || ov.kind !== 'text') { toast('확인할 자막이 없어요 — ＋ 자막으로 먼저 추가해 보세요.', 'warn'); return; }
+    const empty = textIsEmpty(ov);
+    state.selected = null;
+    renderTimeline(); renderRight(); drawNow();
+    foldToTimelineView();
+    toast(empty ? '자막이 비어 있어요 — 타임라인의 자막을 누르면 다시 입력할 수 있어요'
+      : '✓ 자막을 확인했어요 — 타임라인에서 시작·길이를 조절할 수 있어요', empty ? 'warn' : 'ok');
+    return;
+  }
+  if (tab === 'music') {
+    stopBgmPreview();
+    if (state.selected && state.selected.type === 'audio') state.selected = null;
+    renderTimeline(); renderRight();
+    foldToTimelineView();
+    toast('✓ 음악을 확인했어요 — 타임라인의 음악 블록을 끌어 시작점·길이를 조절할 수 있어요', 'ok');
+    return;
+  }
+  const hadClip = !!(state.selected && state.selected.type === 'clip');
+  if (hadClip) state.selected = null;
+  renderTimeline(); renderRight(); drawNow();
+  foldToTimelineView();
+  toast(hadClip ? '✓ 편집을 확인했어요 — 타임라인에서 다시 고를 수 있어요' : '✓ 편집 상태를 확인했어요', 'ok');
+}
+/* 테두리 없음 / 배경 투명 — 한 번 누르면 없애고, 다시 누르면 살린다 */
+function syncOvStyleUI(ov) {
+  if (!ov) return;
+  const bw = toolsPanel.querySelector('input[data-ov="borderWidth"]');
+  if (bw) { bw.value = ov.borderWidth; const v = bw.parentElement.querySelector('.val'); if (v) v.textContent = ov.borderWidth + 'px'; }
+  const bo = toolsPanel.querySelector('input[data-ov="bgOpacity"]');
+  if (bo) { bo.value = ov.bgOpacity; const v = bo.parentElement.querySelector('.val'); if (v) v.textContent = pct(ov.bgOpacity); }
+  const sb = toolsPanel.querySelector('[data-act="strokeNone"]'); if (sb) sb.classList.toggle('on', (ov.borderWidth || 0) <= 0.001);
+  const sg = toolsPanel.querySelector('[data-act="bgNone"]'); if (sg) sg.classList.toggle('on', (ov.bgOpacity || 0) <= 0.001);
+}
+function toggleOvStyle(which) {
+  const ov = selectedOverlay();
+  if (!ov || ov.kind !== 'text') { toast('먼저 자막을 선택해 주세요.', 'warn'); return; }
+  pushHistory();
+  if (which === 'border') {
+    if ((ov.borderWidth || 0) > 0.001) { ov._borderW = ov.borderWidth; ov.borderWidth = 0; }
+    else ov.borderWidth = (ov._borderW > 0 ? ov._borderW : 3);
+  } else {
+    if ((ov.bgOpacity || 0) > 0.001) { ov._bgOp = ov.bgOpacity; ov.bgOpacity = 0; }
+    else ov.bgOpacity = (ov._bgOp > 0 ? ov._bgOp : 0.55);
+  }
+  syncOvStyleUI(ov);
+  drawNow();
+  if (which === 'border') toast((ov.borderWidth || 0) > 0 ? '테두리를 되살렸어요' : '테두리를 없앴어요 — 글자만 남아요', 'ok');
+  else toast((ov.bgOpacity || 0) > 0 ? '배경 박스를 되살렸어요' : '배경을 투명하게 했어요 — 자막 뒤가 비쳐 보여요', 'ok');
+}
+
 /* ---------------- panel clicks ---------------- */
 toolsPanel.addEventListener('click', e => {
   const sticker = e.target.closest('[data-sticker]');
@@ -3689,6 +3867,9 @@ toolsPanel.addEventListener('click', e => {
     renderAll();
     toast('배속 ' + c.speed + '× — 클립 길이 ' + c.duration.toFixed(2) + '초', 'ok');
   } else if (act === 'del') deleteSelected();
+  else if (act === 'confirmTab') confirmTab();
+  else if (act === 'strokeNone') toggleOvStyle('border');
+  else if (act === 'bgNone') toggleOvStyle('bg');
   else if (act === 'setFont') {
     const ov = selectedOverlay();
     if (!ov || ov.kind !== 'text') return;
@@ -3747,7 +3928,7 @@ $('#tabbar').addEventListener('click', e => {
   const panel = toolsPanel;
   const collapsed = panel.classList.contains('collapsed');
   if (tab === b.dataset.tool && !collapsed) { toggleTools(true); return; }
-  if (collapsed) { panel.classList.remove('collapsed'); $('#btnCollapse').classList.remove('up'); }
+  if (collapsed) { panel.classList.remove('collapsed'); document.body.classList.remove('tools-folded'); $('#btnCollapse').classList.remove('up'); }
   tab = b.dataset.tool;
   renderRight();
 });
@@ -3755,12 +3936,14 @@ function toggleTools(forceCollapse) {
   const panel = toolsPanel;
   const collapse = forceCollapse != null ? forceCollapse : !panel.classList.contains('collapsed');
   panel.classList.toggle('collapsed', collapse);
+  document.body.classList.toggle('tools-folded', collapse);
   $('#btnCollapse').classList.toggle('up', collapse);
   setTimeout(() => fitPreview(), 180);
 }
 
 /* ---------------- 타임라인 접기 ↔ 자막 편집 공간 (모바일) ---------------- */
 let tlCollapsed = false, lastLayoutTab = null;
+let tlKeepTimeline = false;   // 타임라인에서 블록을 직접 골랐을 때는 탭이 바뀜서 타임라인을 접지 않는다
 function isNarrowScreen() { return window.innerWidth <= 820; }
 function setTlCollapsed(v) {
   tlCollapsed = !!v;
@@ -3780,7 +3963,8 @@ function applyTabLayout(force) {
   const wide = (tab === 'text' || tab === 'music' || tab === 'image');
   if (wide) document.body.setAttribute('data-panel-tab', tab);
   else document.body.removeAttribute('data-panel-tab');
-  setTlCollapsed(isNarrowScreen() ? wide : false);
+  if (tlKeepTimeline) setTlCollapsed(false);
+  else setTlCollapsed(isNarrowScreen() ? wide : false);
   setTimeout(() => fitPreview(), 80);
   setTimeout(() => fitPreview(), 300);
 }
@@ -3853,6 +4037,19 @@ function showTlTip(e, c) {
   tip.style.top = Math.max(6, e.clientY - 38) + 'px';
 }
 function hideTlTip() { const t = $('#tlTip'); if (t) t.hidden = true; }
+/* 자막·음악 블록 길이 조절 중 안내 — 같은 말풍선(#tlTip)을 쓴다 */
+function trimTipText(kind, x) {
+  if (kind === 'ov') return `T ${fmtTime(x.start)} ~ ${fmtTime(x.end)} · ${Math.max(0, x.end - x.start).toFixed(1)}초`;
+  return `♪ ${fmtTime(x.start)} ~ ${fmtTime(x.start + x.duration)} · ${x.duration.toFixed(1)}초`;
+}
+function showTrimTip(e, text) {
+  const tip = $('#tlTip');
+  if (!tip) return;
+  tip.textContent = text;
+  tip.hidden = false;
+  tip.style.left = Math.max(4, Math.min(window.innerWidth - 150, e.clientX - 40)) + 'px';
+  tip.style.top = Math.max(6, e.clientY - 46) + 'px';
+}
 
 /* ---------------- 재생헤드(빨간 바) 직접 드래그 + 가장자리 자동 스크롤 ----------------
    - 빨간 바 위 32px 히트박스(.ph-hit)를 잡으면 바로 시간이 따라온다.
@@ -3939,6 +4136,29 @@ tlContent.addEventListener('pointerdown', e => {
     if (dc) { state.selected = { type: 'clip', id: dc.id }; deleteSelected(); }
     return;
   }
+  /* 자막·음악 블록의 길이 조절 손잡이 — 본체 드래그·롱프레스 삭제와 완전히 분리 */
+  const trmOvEl = e.target.closest('[data-ovtrim]');
+  if (trmOvEl) {
+    const ov = overlayById(trmOvEl.dataset.id);
+    if (!ov) return;
+    e.preventDefault(); lpCancel();
+    if (!(state.selected && state.selected.type === 'overlay' && state.selected.id === ov.id)) selectOverlay(ov.id);
+    tlDrag = { kind: 'ovtrim', side: trmOvEl.dataset.ovtrim, ov, x, start: ov.start, end: ov.end, moved: false, snap: snapshot() };
+    document.body.classList.add('trm-dragging');
+    showTrimTip(e, trimTipText('ov', ov));
+    return;
+  }
+  const trmAuEl = e.target.closest('[data-autrim]');
+  if (trmAuEl) {
+    const a = audioById(trmAuEl.dataset.id);
+    if (!a) return;
+    e.preventDefault(); lpCancel();
+    if (!(state.selected && state.selected.type === 'audio' && state.selected.id === a.id)) selectAudio(a.id, true);
+    tlDrag = { kind: 'autrim', side: trmAuEl.dataset.autrim, a, x, start: a.start, in: a.in || 0, duration: a.duration, end: a.start + a.duration, moved: false, snap: snapshot() };
+    document.body.classList.add('trm-dragging');
+    showTrimTip(e, trimTipText('audio', a));
+    return;
+  }
   const hEl = e.target.closest('[data-handle]');
   if (hEl) {
     const hc = clipById(hEl.dataset.id);
@@ -3955,7 +4175,7 @@ tlContent.addEventListener('pointerdown', e => {
   if (ovEl) {
     const ov = overlayById(ovEl.dataset.id);
     if (!ov) return;
-    selectOverlay(ov.id);
+    selectOverlay(ov.id, true);   // 타임라인은 펼친 채 자막을 고른다 → 바로 양끝 손잡이로 길이 조절
     tlDrag = { kind: 'ov', ov, x, start: ov.start, span: ov.end - ov.start, moved: false, snap: snapshot() };
     e.preventDefault();
   } else if (auEl) {
@@ -4006,6 +4226,39 @@ window.addEventListener('pointermove', e => {
     return;
   }
   const dx = (x - tlDrag.x) / state.zoom;
+  /* 길이 조절: 손잡이를 옮긴 만큼 바로 반영 (미세 이동도 막지 않는다) */
+  if (tlDrag.kind === 'ovtrim') {
+    const ov = tlDrag.ov;
+    const MIN = 0.3;
+    const maxEnd = Math.max(ov.start + MIN, totalDuration() || 0.5);
+    if (tlDrag.side === 'right') ov.end = round2(clamp(tlDrag.end + dx, ov.start + MIN, maxEnd));
+    else ov.start = round2(clamp(tlDrag.start + dx, 0, ov.end - MIN));
+    tlDrag.moved = true;
+    updateOverlayBlockEl(ov);
+    drawNow();
+    showTrimTip(e, trimTipText('ov', ov));
+    return;
+  }
+  if (tlDrag.kind === 'autrim') {
+    const a = tlDrag.a;
+    const src = assets.get(a.assetId) || {};
+    const srcDur = src.duration || (src._buf && src._buf.duration) || 3600;
+    if (tlDrag.side === 'right') {
+      /* 끝을 늘이지거나 줄이기 — 원본 음악 길이까지만 소리가 나온다 */
+      const srcMax = Math.max(0.2, srcDur - (a.in || 0));
+      a.duration = round2(clamp(tlDrag.duration + dx, 0.2, Math.max(srcMax, tlDrag.duration)));
+    } else {
+      /* 시작점을 뒤로 = 앞부분 트림(in ↑, 길이 ↓) — 곡 내용은 그대로 이어진다 */
+      const d = clamp(dx, -(tlDrag.in || 0), tlDrag.duration - 0.3);
+      a.start = round2(Math.max(0, tlDrag.start + d));
+      a.in = round2(clamp((tlDrag.in || 0) + d, 0, Math.max(0, srcDur - 0.2)));
+      a.duration = round2(Math.max(0.2, tlDrag.end - a.start));
+    }
+    tlDrag.moved = true;
+    renderTimeline();
+    showTrimTip(e, trimTipText('audio', a));
+    return;
+  }
   if (Math.abs(dx) < 0.015 && !tlDrag.moved) return;
   tlDrag.moved = true;
   const total = Math.max(totalDuration(), 0.2);
@@ -4024,9 +4277,11 @@ window.addEventListener('pointermove', e => {
 });
 window.addEventListener('pointerup', e => {
   lpCancel();
-  if (!tlDrag) return;
+  if (!tlDrag) { document.body.classList.remove('trm-dragging'); return; }
   hideTlTip();
+  document.body.classList.remove('trm-dragging');
   const dragKind = tlDrag.kind, dragMoved = tlDrag.moved;
+  const dragOv = tlDrag.ov || null, dragAu = tlDrag.a || null;
   if (tlDrag.kind === 'scrub') {
     phStopScrub();
     if (!tlDrag.moved) phTapThrough(e.clientX, e.clientY);
@@ -4038,12 +4293,14 @@ window.addEventListener('pointerup', e => {
     updateHistoryButtons();
   }
   tlDrag = null;
-  if (dragKind === 'audio' && state.playing) { stopAllMusic(); syncMusic(state.time); }   // 음악 블록을 옮겼으면 새 위치로
+  if ((dragKind === 'audio' || dragKind === 'autrim') && state.playing) { stopAllMusic(); syncMusic(state.time); }   // 음악 블록을 옮겼거나 길이를 바꿨으면 새 구간으로
   renderTimeline();
+  if (dragMoved && dragKind === 'ovtrim' && dragOv) toast(trimTipText('ov', dragOv), 'ok');
+  if (dragMoved && dragKind === 'autrim' && dragAu) toast(trimTipText('audio', dragAu), 'ok');
   // 음악 블록을 톡 치고 뗐을 때만 음악 탭(볼륨·길이 조절)으로 넘어간다
   if (dragKind === 'audio' && !dragMoved && audioById(state.selected && state.selected.id)) { tab = 'music'; renderRight(); }
 });
-window.addEventListener('pointercancel', () => { lpCancel(); if (tlDrag && tlDrag.kind === 'scrub') { phStopScrub(); tlDrag = null; } });
+window.addEventListener('pointercancel', () => { lpCancel(); document.body.classList.remove('trm-dragging'); if (tlDrag && (tlDrag.kind === 'scrub' || tlDrag.kind === 'ovtrim' || tlDrag.kind === 'autrim')) { phStopScrub(); tlDrag = null; renderTimeline(); } });
 
 /* ---------------- preview canvas interactions -------------
    · 자막/이미지를 한 손가락으로 끌면 위치가 자유롭게 따라온다
