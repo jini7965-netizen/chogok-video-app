@@ -3345,7 +3345,6 @@ function musicPanelHTML() {
       <span class="tool-label" style="min-width:auto">전체</span>
       ${ctl('원본 영상', rng('global', 'video', 0, 1, 0.02, state.globalVideoVolume) + valSpan(pct(state.globalVideoVolume)))}
       <label class="chip chk mute-orig${state.globalVideoMuted ? ' on' : ''}" style="cursor:pointer" title="영상 원래 소리를 꺼서 배경음악만 들리게 합니다"><input type="checkbox" data-global="videoMute" ${state.globalVideoMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 🔇 원본 음소거</label>
-      <button class="pill orig-mute${state.globalVideoMuted ? ' on' : ''}" data-act="toggleOrigAudio" title="편집 탭과 같은 버튼 — 원본 영상 소리를 한 번에 끄거나 켭니다">${origMuteLabel()}</button>
       ${ctl('배경음악', rng('global', 'music', 0, 1, 0.02, state.globalMusicVolume) + valSpan(pct(state.globalMusicVolume)))}
       <label class="chip chk${state.globalMusicMuted ? ' on' : ''}" style="cursor:pointer"><input type="checkbox" data-global="musicMute" ${state.globalMusicMuted ? 'checked' : ''} style="accent-color:var(--accent)"> 음악 음소거</label>
     </div>
