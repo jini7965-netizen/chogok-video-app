@@ -664,6 +664,37 @@ body[data-panel-tab=effect] .tools-panel.collapsed, body[data-panel-tab=template
   body[data-panel-tab=effect] .tool-row, body[data-panel-tab=template] .tool-row{margin-bottom:9px}
   body[data-panel-tab=effect] .tools-panel .pill, body[data-panel-tab=template] .tools-panel .pill{min-height:32px; padding:7px 11px; font-size:11.5px}
 }
+
+/* ---------- v10: 하단 ‘속도·길이’ 탭 ---------- */
+.tabbar button.tab{white-space:nowrap}
+.tabbar button.tab[data-tool=speed]{letter-spacing:-.2px}
+body[data-panel-tab=speed] .tools-panel{height:216px}
+body[data-panel-tab=speed] .tools-panel.has-actions{padding-top:0}
+body[data-panel-tab=speed] .tools-panel.collapsed{height:0; padding-top:0; padding-bottom:0}
+/* 지금 조절할 대상 — 무엇을 고른 상태인지 한 줄로 분명하게 */
+.pad-head{
+  gap:6px; padding:5px 8px; border-radius:10px;
+  border:1px solid rgba(139,108,255,.26); background:linear-gradient(90deg,rgba(139,108,255,.16),rgba(95,224,192,.05));
+}
+.pad-head .pad-sel{border-color:#8b6cff; background:#241f49; color:#e6dcff; font-weight:800}
+.pad-name{font-size:11.5px; color:#fff; font-weight:700; max-width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pad-now{font-size:10.5px; color:#9aa6bb; white-space:nowrap; margin-left:auto; font-variant-numeric:tabular-nums}
+.pad-now b{color:#ffd166}
+.pad-speed{gap:5px}
+.pad-speed button{min-width:40px; min-height:26px; display:inline-flex; align-items:center; justify-content:center; padding:4px 0}
+.pad-bulk{font-size:10.5px; font-weight:800; color:#fff; background:rgba(255,255,255,.16); border-radius:5px; padding:0 5px; margin-left:2px}
+@media (max-width:900px){
+  /* 타임라인은 펴 둔 채(클립을 보며), 도구 영역만 속도·길이 조작에 맞게 넓힌다 */
+  body[data-panel-tab=speed] .stage-inner{height:min(24vh,210px)}
+  body[data-panel-tab=speed] .timeline{height:152px; min-height:152px}
+  body[data-panel-tab=speed] .tools-panel{height:clamp(232px,40vh,336px); padding:9px 10px 10px}
+  body[data-panel-tab=speed] .tool-row{gap:6px; margin-bottom:5px; min-height:24px}
+  body[data-panel-tab=speed] .tools-panel .pill{min-height:28px; padding:5px 9px; font-size:11px}
+  body[data-panel-tab=speed] .tools-panel .speed-chips button{min-height:30px; min-width:44px; padding:6px 0; font-size:11.5px}
+  body[data-panel-tab=speed] .ctl input[type=number]{width:52px; font-size:12px; padding:4px 6px}
+  body[data-panel-tab=speed] .ctl input[type=range]{width:92px}
+  .tabbar button.tab[data-tool=speed]{font-size:9px; letter-spacing:-.3px}
+}
 /* 행사 템플릿 카드 */
 .tpl-strip{display:flex; gap:8px; overflow-x:auto; max-width:100%; padding:2px 0 4px; scrollbar-width:none}
 .tpl-strip::-webkit-scrollbar{display:none}
@@ -940,6 +971,7 @@ canvas#preview{-webkit-touch-callout:none}
     <div class="tools-panel" id="toolsPanel"></div>
     <nav class="tabbar" id="tabbar">
       <button class="tab on" data-tool="edit"><span class="ico" data-ico="scissors"></span>편집</button>
+      <button class="tab" data-tool="speed"><span class="ico" data-ico="gauge"></span>속도·길이</button>
       <button class="tab" data-tool="text"><span class="ico" data-ico="text"></span>자막</button>
       <button class="tab" data-tool="image"><span class="ico" data-ico="star"></span>이미지</button>
       <button class="tab" data-tool="music"><span class="ico" data-ico="note"></span>음악</button>
@@ -2996,20 +3028,20 @@ function formatVal(p, v, unit) {
 /* ---------------- selection ---------------- */
 function selectClip(id) {
   state.selected = id ? { type: 'clip', id } : null;
-  tab = 'edit';
+  if (tab !== 'speed') tab = 'edit';   // 하단 ‘속도·길이’ 탭에서 다른 클립을 골라도 그 탭을 유지
   renderRight(); renderTimeline(); drawNow();
 }
 function selectOverlay(id, keepTimeline) {
   const ov = id ? overlayById(id) : null;
   state.selected = id ? { type: 'overlay', id } : null;
-  tab = ov ? (ov.kind === 'text' ? 'text' : ov.kind === 'mosaic' ? 'effect' : 'image') : 'edit';
+  if (tab !== 'speed') tab = ov ? (ov.kind === 'text' ? 'text' : ov.kind === 'mosaic' ? 'effect' : 'image') : 'edit';
   if (keepTimeline) tlKeepTimeline = true;   // 타임라인에서 직접 골랐으면 타임라인은 펼친 채로 둔다
   renderRight(); renderTimeline(); drawNow();
   tlKeepTimeline = false;
 }
 function selectAudio(id, keepTab) {
   state.selected = { type: 'audio', id };
-  if (!keepTab) tab = 'music';   // 타임라인에서 꼭 누르는 중에는 탭을 바꾸지 않는다(음악 탭이 타임라인을 접어 버림)
+  if (!keepTab && tab !== 'speed') tab = 'music';   // 타임라인에서 꼭 누르는 중에는 탭을 바꾸지 않는다(음악 탭이 타임라인을 접어 버림)
   renderRight(); renderTimeline();
 }
 
@@ -3121,7 +3153,8 @@ function panelActionsHTML(kind) {
   const canDel = ov && ov.kind === 'text';
   const hint = kind === 'text' ? '자막 편집을 마치면 확인'
     : kind === 'music' ? '음악 설정을 마치면 확인'
-      : '편집을 마치면 확인 — 선택이 풀리고 타임라인으로 돌아가요';
+      : kind === 'speed' ? '속도·길이를 마치면 확인'
+        : '편집을 마치면 확인 — 선택이 풀리고 타임라인으로 돌아가요';
   return `<div class="panel-actions" data-actions="${kind}">
     <button type="button" class="pill ok" data-act="confirmTab" title="지금 편집·선택을 확정하고 타임라인 확인 상태로 돌아갑니다">✓ 확인</button>
     ${canDel ? `<button type="button" class="pill warn" data-act="del" title="선택한 자막 삭제">🗑 삭제</button>` : ''}
@@ -3150,6 +3183,244 @@ function ovLabel(o) {
   if (o.kind === 'text') return (o.text || '자막').replace(/\n/g, ' ');
   if (o.kind === 'mosaic') return (o.mode === 'blur' ? '블러' : '모자이크') + ' · ' + (o.strength === 'soft' ? '약' : o.strength === 'strong' ? '강' : '중');
   return (assets.get(o.assetId) || {}).name || '이미지';
+}
+
+/* ============================================================
+   v10 — 하단 ‘속도·길이’ 탭
+   타임라인 손잡이를 끌지 않아도, 아래 탭에서 버튼만 눌러
+   지금 고른 클립·자막·음악의 속도와 시작·길이를 바로 바꾼다.
+   ============================================================ */
+let padSpeedPick = null;      // ‘전체 클립 속도 일괄 적용’에 쓸 배속 (null이면 고른 클립 배속을 따른다)
+function padSec(v) {
+  const n = Math.round((Number(v) || 0) * 100) / 100;
+  return (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '')) + '초';
+}
+function padSpeedEff() {
+  if (padSpeedPick != null) return padSpeedPick;
+  const c = selectedClip();
+  return c && c.kind !== 'image' ? (c.speed || 1) : 1;
+}
+/* 지금 조절할 대상 — 클립 > 자막·이미지 > 음악 순으로 고른 것을 따른다 */
+function padTarget() {
+  const c = selectedClip();
+  if (c) {
+    const img = c.kind === 'image';
+    return {
+      kind: 'clip', obj: c, unit: img ? '사진' : (c.kind === 'demo' ? '장면' : '영상'),
+      name: c.name || '클립', canSpeed: !img,
+      len: () => c.duration,
+      setLen: d => setClipDuration(c, d),
+      minLen: 0.2,
+      maxLen: () => clipMaxDuration(c),
+      maxStart: () => Math.max(0, clipSourceLength(c) - c.duration * (c.speed || 1)),
+      hasStart: !img,
+      start: () => c.inPoint || 0,
+      setStart: v => { c.inPoint = clamp(v, 0, Math.max(0, clipSourceLength(c) - c.duration * (c.speed || 1))); },
+      speed: () => c.speed || 1,
+      setSpeed: v => setClipSpeed(c, v)
+    };
+  }
+  const ov = selectedOverlay();
+  if (ov) {
+    return {
+      kind: 'overlay', obj: ov,
+      unit: ov.kind === 'text' ? '자막' : (ov.kind === 'mosaic' ? '가리기' : '이미지'),
+      name: ovLabel(ov), canSpeed: false,
+      len: () => Math.max(0.1, ov.end - ov.start),
+      setLen: d => { ov.end = Math.min(ov.start + clamp(d, 0.1, 3600), Math.max(ov.start + 0.1, totalDuration() || 3600)); },
+      minLen: 0.1,
+      maxLen: () => Math.max(0.1, (totalDuration() || 3600) - ov.start),
+      maxStart: () => Math.max(0, ov.end - 0.1),
+      hasStart: true,
+      start: () => ov.start,
+      setStart: v => { ov.start = clamp(v, 0, Math.max(0, ov.end - 0.1)); },
+      speed: () => 1,
+      setSpeed: () => { }
+    };
+  }
+  const a = selectedAudio();
+  if (a) {
+    const src = Math.max(0.2, ((assets.get(a.assetId) || {}).duration) || 3600);
+    return {
+      kind: 'audio', obj: a, unit: '음악', name: a.name || '음악', canSpeed: false,
+      len: () => a.duration,
+      setLen: d => { a.duration = clamp(d, 0.2, Math.min(3600, src)); },
+      minLen: 0.2,
+      maxLen: () => Math.max(0.2, Math.min(3600, src)),
+      maxStart: () => 3600,
+      hasStart: true,
+      start: () => a.start || 0,
+      setStart: v => { a.start = clamp(v, 0, 3600); },
+      speed: () => 1,
+      setSpeed: () => { }
+    };
+  }
+  return null;
+}
+/* 바꾼 뒤 화면·타임라인·소리를 한 번에 맞춘다 */
+function padAfterChange(t) {
+  state.time = clamp(state.time, 0, totalDuration());
+  if (t && t.kind === 'audio') {
+    applyAudioItem(t.obj);
+    stopMusicNode(t.obj);
+    if (state.playing) syncMusic(state.time);
+  }
+  renderAll();
+}
+function padLenTo(v) {
+  const t = padTarget();
+  if (!t) { toast('타임라인에서 먼저 클립·자막·음악을 톡 눌러 주세요.', 'warn'); return false; }
+  const before = t.len();
+  const want = clamp(Number(v) || 0, t.minLen, t.maxLen());
+  if (Math.abs(want - before) < 0.005) {
+    toast(padSec(before) + '에서 더는 바꿀 수 없어요 (최대 ' + padSec(t.maxLen()) + ')', 'warn');
+    return false;
+  }
+  pushHistory();
+  t.setLen(want);
+  padAfterChange(t);
+  toast('✓ ' + t.unit + ' 길이 ' + padSec(t.len()), 'ok');
+  return true;
+}
+function padLenBy(d) {
+  const t = padTarget();
+  if (!t) { toast('타임라인에서 먼저 클립·자막·음악을 톡 눌러 주세요.', 'warn'); return false; }
+  return padLenTo(t.len() + (Number(d) || 0));
+}
+function padStartTo(v) {
+  const t = padTarget();
+  if (!t || !t.hasStart) return false;
+  const before = t.start();
+  const want = clamp(Number(v) || 0, 0, t.maxStart());
+  if (Math.abs(want - before) < 0.005) { toast('시작점을 더는 옮길 수 없어요', 'warn'); return false; }
+  pushHistory();
+  t.setStart(want);
+  padAfterChange(t);
+  toast('✓ ' + t.unit + ' 시작 ' + padSec(t.start()), 'ok');
+  return true;
+}
+function padStartBy(d) {
+  const t = padTarget();
+  if (!t || !t.hasStart) return false;
+  return padStartTo(t.start() + (Number(d) || 0));
+}
+function padSetSpeed(s) {
+  padSpeedPick = Math.round((Number(s) || 1) * 100) / 100;
+  const t = padTarget();
+  if (!t || !t.canSpeed) {
+    renderRight();
+    toast('배속 ' + padSpeedPick + '× 를 골랐어요 — ‘전체 클립 속도 일괄 적용’을 누르면 모든 영상에 넣어요');
+    return;
+  }
+  pushHistory();
+  t.setSpeed(padSpeedPick);
+  padAfterChange(t);
+  toast('✓ ' + t.unit + ' 배속 ' + padSpeedPick + '× · 길이 ' + padSec(t.len()), 'ok');
+}
+function padSpeedAll() {
+  const vids = state.clips.filter(c => c.kind !== 'image');
+  if (!vids.length) { toast('적용할 영상 클립이 없어요.', 'warn'); return; }
+  const v = padSpeedEff();
+  pushHistory();
+  vids.forEach(c => setClipSpeed(c, v));
+  padAfterChange(null);
+  toast('⚡ 영상 ' + vids.length + '개 클립에 배속 ' + v + '× 를 한 번에 적용했어요', 'ok');
+}
+function padPhotoAll() {
+  const pics = state.clips.filter(c => c.kind === 'image');
+  if (!pics.length) { toast('길이를 맞출 사진이 없어요.', 'warn'); return; }
+  pushHistory();
+  pics.forEach(c => { c.duration = clamp(photoDefault, 0.2, 60); });
+  padAfterChange(null);
+  toast('🖼 사진 ' + pics.length + '장을 ' + padSec(photoDefault) + '로 한 번에 맞췄어요', 'ok');
+}
+/* 슬라이더·숫자칸을 움직이는 동안 값 표시만 따라오게 한다(패널을 다시 그리지 않음) */
+function padSyncValues() {
+  const t = padTarget();
+  if (!t) return;
+  const q = s => toolsPanel.querySelector(s);
+  const lenVal = q('#padLenVal'); if (lenVal) lenVal.textContent = padSec(t.len());
+  const ln = q('#padLenNum'); if (ln && document.activeElement !== ln) ln.value = Math.round(t.len() * 100) / 100;
+  const lr = q('#padLenRange'); if (lr && document.activeElement !== lr) lr.value = Math.min(t.len(), parseFloat(lr.max) || 60);
+  const sv = q('#padStartVal'); if (sv) sv.textContent = padSec(t.start());
+  const sn = q('#padStartNum'); if (sn && document.activeElement !== sn) sn.value = Math.round(t.start() * 10) / 10;
+  const spv = q('#padSpeedVal'); if (spv) spv.textContent = t.speed() + '×';
+  if (t.canSpeed) toolsPanel.querySelectorAll('[data-act=padSpeed]').forEach(b => b.classList.toggle('on', Math.abs(t.speed() - parseFloat(b.dataset.speed)) < 0.001));
+}
+function onPadInput(t) {
+  const target = padTarget();
+  if (!target) return;
+  const v = parseFloat(t.value);
+  if (isNaN(v)) return;
+  if (t.dataset.pad === 'start') {
+    if (!target.hasStart) return;
+    target.setStart(v);
+    if (Math.abs(parseFloat(t.value) - target.start()) > 0.001) t.value = Math.round(target.start() * 10) / 10;
+  } else {
+    target.setLen(v);
+    if (Math.abs(parseFloat(t.value) - target.len()) > 0.001) t.value = Math.round(target.len() * 100) / 100;
+  }
+  state.time = clamp(state.time, 0, totalDuration());
+  if (target.kind === 'audio') {
+    applyAudioItem(target.obj);
+    stopMusicNode(target.obj);
+    if (state.playing) syncMusic(state.time);
+  }
+  layout();
+  renderTimeline();
+  updateTimeUI();
+  drawNow();
+  padSyncValues();
+}
+/* ---------------- panel: 속도·길이 ---------------- */
+function speedPanelHTML() {
+  const t = padTarget();
+  const eff = padSpeedEff();
+  const head = t
+    ? `<div class="tool-row pad-head">
+        <span class="tool-label">선택</span>
+        <span class="chip pad-sel">${t.unit}</span>
+        <b class="pad-name">${esc(t.name)}</b>
+        <span class="pad-now">${t.canSpeed ? '배속 <b>' + t.speed() + '×</b> · ' : ''}길이 <b id="padLenVal">${padSec(t.len())}</b></span>
+      </div>`
+    : `<div class="tool-row pad-head">
+        <span class="tool-label">선택</span>
+        <span class="hint-inline">타임라인에서 <b>영상·사진·자막·음악</b>을 톡 눌러 고르면, 여기 버튼으로 속도·길이를 바로 바꿀 수 있어요.</span>
+      </div>`;
+  const speedRow = `<div class="tool-row">
+      <span class="tool-label">속도</span>
+      ${t && !t.canSpeed
+      ? `<span class="hint-inline">${t.unit}은 속도 없이 길이만 조절해요</span>`
+      : `<div class="speed-chips pad-speed">${[0.5, 1, 1.5, 2, 3].map(s =>
+        `<button data-act="padSpeed" data-speed="${s}" title="이 클립을 ${s}배속으로">${s}×</button>`).join('')}</div>`}
+      ${t && t.canSpeed ? ctl('미세', rng('clip', 'speed', 0.25, 4, 0.05, t.speed()) + `<span class="val" id="padSpeedVal">${t.speed()}×</span>`) : ''}
+      <button class="pill primary" data-act="padSpeedAll" title="위에서 고른 배속을 모든 영상 클립에 한 번에 적용">⚡ 전체 클립 속도 일괄 적용<b class="pad-bulk">${eff}×</b></button>
+    </div>`;
+  const lenRows = !t
+    ? `<div class="tool-row"><span class="tool-label">길이</span><span class="hint-inline">클립을 고르면 −0.5초 · ＋0.5초 · 2·3·5초 버튼이 나타나요.</span></div>`
+    : `<div class="tool-row">
+        <span class="tool-label">길이</span>
+        <button class="pill" data-act="padLen" data-d="-0.5" title="0.5초 줄이기">−0.5초</button>
+        <button class="pill" data-act="padLen" data-d="0.5" title="0.5초 늘리기">＋0.5초</button>
+        ${[2, 3, 5].map(s => `<button class="pill" data-act="padSetLen" data-v="${s}" title="길이를 ${s}초로">${s}초</button>`).join('')}
+      </div>
+      <div class="tool-row">
+        ${ctl('직접', `<input type="number" id="padLenNum" data-pad="len" min="${t.minLen}" max="${Math.round(t.maxLen() * 100) / 100}" step="0.1" value="${Math.round(t.len() * 100) / 100}">` + `<span class="val" id="padLenVal">${padSec(t.len())}</span>` + `<input type="range" id="padLenRange" data-pad="len" min="${t.minLen}" max="${Math.max(t.minLen + 0.2, Math.min(t.maxLen(), 60))}" step="0.1" value="${Math.round(Math.min(t.len(), 60) * 100) / 100}">`)}
+      </div>
+      <div class="tool-row">
+        ${t.hasStart
+        ? `${ctl('시작', `<input type="number" id="padStartNum" data-pad="start" min="0" max="${Math.round(t.maxStart() * 100) / 100}" step="0.1" value="${Math.round(t.start() * 10) / 10}">` + `<span class="val" id="padStartVal">${padSec(t.start())}</span>`)}
+           <button class="pill" data-act="padStart" data-d="-0.5" title="시작을 0.5초 앞으로">시작 −0.5초</button>
+           <button class="pill" data-act="padStart" data-d="0.5" title="시작을 0.5초 뒤로">시작 ＋0.5초</button>`
+        : '<span class="tool-label">시작</span><span class="hint-inline">사진은 시작점 없이 길이만 바꿔요</span>'}
+      </div>`;
+  const bulkRow = `<div class="tool-row">
+      <span class="tool-label">사진·음악</span>
+      ${ctl('사진 길이', num('bulk', 'photo', 0.5, 60, 0.5, photoDefault) + valSpan('초'))}
+      <button class="pill primary" data-act="padPhotoAll" title="모든 사진 클립을 위 길이로 한 번에 맞춥니다">🖼 전체 사진 길이 일괄 맞추기</button>
+      <button class="pill" data-act="fitMusic" title="넣은 배경음악 길이에 사진 클립 길이를 균등하게 맞춥니다">${ico('musicfit')}음악 길이에 사진 맞추기</button>
+    </div>`;
+  return `${panelActionsHTML('speed')}${head}${speedRow}${lenRows}${bulkRow}`;
 }
 
 /* ---------------- panel: 편집 ---------------- */
@@ -3967,7 +4238,8 @@ function renderRight() {
   $$('#tabbar .tab').forEach(b => b.classList.toggle('on', b.dataset.tool === tab));
   applyTabLayout();   // 모바일: 자막 탭이면 타임라인을 접어 편집 공간을 넓힌다
   let html = '';
-  if (tab === 'text') html = textPanelHTML();
+  if (tab === 'speed') html = speedPanelHTML();
+  else if (tab === 'text') html = textPanelHTML();
   else if (tab === 'image') html = imagePanelHTML();
   else if (tab === 'music') html = musicPanelHTML();
   else if (tab === 'effect') html = effectPanelHTML();
@@ -4131,6 +4403,7 @@ function onClipInput(t) {
   }
   const valEl = t.parentElement.querySelector('.val');
   if (valEl && (p === 'speed' || p === 'volume')) valEl.textContent = p === 'volume' ? pct(c.volume) : (c.speed + '×');
+  if (tab === 'speed') padSyncValues();   // 속도·길이 탭의 값 표시도 같이 따라오게
   state.time = clamp(state.time, 0, totalDuration());
   layout();
   renderTimeline();
@@ -4187,7 +4460,8 @@ function onBulkInput(t) {
 }
 toolsPanel.addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset.ov) onOverlayInput(t);
+  if (t.dataset.pad) onPadInput(t);
+  else if (t.dataset.ov) onOverlayInput(t);
   else if (t.dataset.clip) onClipInput(t);
   else if (t.dataset.audio) onAudioInput(t);
   else if (t.dataset.global) onGlobalInput(t);
@@ -4265,6 +4539,14 @@ function confirmTab() {
     renderTimeline(); renderRight();
     foldToTimelineView();
     toast('✓ 음악을 확인했어요 — 타임라인의 음악 블록을 끌어 시작점·길이를 조절할 수 있어요', 'ok');
+    return;
+  }
+  if (tab === 'speed') {
+    const had = !!state.selected;
+    renderTimeline(); renderRight(); drawNow();
+    foldToTimelineView();
+    toast(had ? '✓ 속도·길이를 확인했어요 — 타임라인에서도 양끝 손잡이로 조절할 수 있어요'
+      : '✓ 확인했어요 — 타임라인에서 클립을 톡 누르면 속도·길이 버튼이 나타나요', 'ok');
     return;
   }
   const hadClip = !!(state.selected && state.selected.type === 'clip');
@@ -4424,6 +4706,13 @@ toolsPanel.addEventListener('click', e => {
   else if (act === 'autoMagic') openMagicModal();
   else if (act === 'fitMusic') fitPhotosToMusic();
   else if (act === 'insPhrase') insertPhrase(b.dataset.p);
+  /* ---- v10: 속도·길이 탭 ---- */
+  else if (act === 'padSpeed') padSetSpeed(b.dataset.speed);
+  else if (act === 'padSpeedAll') padSpeedAll();
+  else if (act === 'padLen') padLenBy(parseFloat(b.dataset.d) || 0);
+  else if (act === 'padSetLen') padLenTo(parseFloat(b.dataset.v) || 0);
+  else if (act === 'padStart') padStartBy(parseFloat(b.dataset.d) || 0);
+  else if (act === 'padPhotoAll') padPhotoAll();
 });
 
 /* ---------------- tab bar ---------------- */
@@ -4468,7 +4757,8 @@ function applyTabLayout(force) {
   lastLayoutTab = tab;
   /* 자막·음악·이미지·효과·템플릿 탭은 고르고 쓰는 화면 — 도구 영역을 넓히고(모바일은 타임라인도 접음) */
   const wide = (tab === 'text' || tab === 'music' || tab === 'image' || tab === 'effect' || tab === 'template');
-  if (wide) document.body.setAttribute('data-panel-tab', tab);
+  /* v10 속도·길이 탭: 도구 영역은 넓히되 타임라인은 펴 둔다 — 클립을 보며 고르고 바로 조절해야 해서 */
+  if (wide || tab === 'speed') document.body.setAttribute('data-panel-tab', tab);
   else document.body.removeAttribute('data-panel-tab');
   if (tlKeepTimeline) setTlCollapsed(false);
   else setTlCollapsed(isNarrowScreen() ? wide : false);
@@ -7096,7 +7386,8 @@ const ICO = {
   mic: '<rect x="7.6" y="3" width="4.8" height="8" rx="2.4"/><path d="M5.2 10a4.8 4.8 0 0 0 9.6 0M10 14.8V17M7.6 17h4.8"/>',
   badge: '<circle cx="10" cy="9" r="4.6"/><path d="M4 17.6c0-1.9 2.7-3 6-3s6 1.1 6 3"/><path d="M8.2 9.1l1.3 1.3 2.4-2.4"/>',
   musicfit: '<circle cx="6" cy="14.4" r="2"/><path d="M8 14.4V6.2l6-1.4v9.6"/><path d="M14 4.8h4M16 2.8l2 2-2 2"/>',
-  spark: '<path d="M10 2.8 11.6 8l5.2 1.6-5.2 1.6L10 16.4 8.4 11.2 3.2 9.6 8.4 8z"/>'
+  spark: '<path d="M10 2.8 11.6 8l5.2 1.6-5.2 1.6L10 16.4 8.4 11.2 3.2 9.6 8.4 8z"/>',
+  gauge: '<path d="M3.1 12.6a6.9 6.9 0 0 1 13.8 0"/><path d="M10 12.6 13.4 8.4"/><circle cx="10" cy="12.6" r="1.1"/><path d="M4.9 17.3h10.2"/>'
 };
 function ico(name, extra) {
   const d = ICO[name] || '';
@@ -7401,10 +7692,12 @@ const HELP_STEPS = [
   { ico: 'image', t: '사진·영상 올리기', d: '편집 탭에서 <b>＋ 사진 여러 장</b>을 눌러 사진첩에서 한 번에 고르세요. 타임라인 맨 끝 ＋로 더 넣을 수 있어요.' },
   { ico: 'wand', t: '자동 완성 · 첫 소개화면 · 엔딩', d: '<b>✨ 1분 자동 완성</b>을 누르면 소개화면·2.5초 사진·페이드·BGM·이름표가 한 번에 들어가요. 직접 만들려면 <b>첫 소개화면</b>·<b>엔딩 인사</b>를 쓰세요.' },
   { ico: 'text', t: '자막 · 스티커 · 얼굴 모자이크', d: '자막 탭에서 <b>자주 쓰는 문구</b>를 톡 누르면 바로 들어가요. 이미지 탭의 스티커, 효과 탭의 <b>모자이크</b>로 아이 얼굴을 가릴 수 있어요.' },
+  { ico: 'gauge', t: '속도 · 길이 버튼으로 맞추기', d: '아래 <b>속도·길이</b> 탭을 누르고 클립을 고르면 <b>0.5×·1×·1.5×·2×·3×</b>와 <b>−0.5초·＋0.5초·2·3·5초</b> 버튼으로 바로 바꿔요. 사진·음악은 <b>전체 길이 일괄 맞추기</b>로 한 번에 정리해요.' },
   { ico: 'mic', t: '음악 · 목소리 녹음', d: '음악 탭에서 동요 BGM을 고르고, <b>목소리 녹음</b>으로 선생님 내레이션을 넣으세요. 소개·엔딩 장면 길이에 사진을 맞추려면 <b>음악에 사진 맞추기</b>를 누르세요.' },
   { ico: 'save', t: '화질 골라 내보내기', d: '<b>영상 내보내기</b>를 누르고 <b>1080p 고화질</b>이나 <b>720p 빠른 저장</b>을 고르면 끝! 작업은 자동 임시저장돼서 앱을 닫았다 열어도 이어서 할 수 있어요.' }
 ];
 const HELP_TIPS = [
+  '아래 <b>속도·길이</b> 탭에서 버튼만 눌러도 배속과 길이가 바뀜요 — 드래그가 어려울 때 쓰세요.',
   '클립·자막·음악 블록의 <b>양끝 손잡이</b>를 끌면 길이가 늘어나고 줄어들어요.',
   '타임라인 음악 블록을 <b>꾹 누르면</b> 바로 삭제돼요 (실행 취소로 되돌릴 수 있어요).',
   '편집을 마치고 <b>✓ 확인</b>을 누르면 선택이 풀리고 타임라인이 크게 펴져요.',
@@ -7568,6 +7861,14 @@ function boot() {
         set: (o) => { Object.assign(introState, o || {}); renderIntroPreview(); syncIntroUI(); },
         paint: paintIntroCover
       }
+    },
+    /* ---- v10: 하단 속도·길이 ---- */
+    v10: {
+      tab: () => tab,
+      target: () => { const t = padTarget(); return t ? { kind: t.kind, unit: t.unit, len: +t.len().toFixed(2), start: +t.start().toFixed(2), canSpeed: t.canSpeed, speed: t.speed(), maxLen: +t.maxLen().toFixed(2) } : null; },
+      lenTo: padLenTo, lenBy: padLenBy, startTo: padStartTo, startBy: padStartBy,
+      setSpeed: padSetSpeed, speedAll: padSpeedAll, photoAll: padPhotoAll,
+      bulkSpeed: () => padSpeedEff(), setBulkSpeed: v => { padSpeedPick = v; renderRight(); }
     }
   };
 }
