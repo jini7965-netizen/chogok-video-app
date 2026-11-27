@@ -153,6 +153,16 @@ canvas#preview.dragging{cursor:grabbing}
 .tl-hint{font-size:10.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:42%}
 .zoom{margin-left:auto; display:flex; align-items:center; gap:6px; font-size:10px; color:var(--muted)}
 .zoom input{width:96px; accent-color:var(--accent)}
+/* 타임라인 접기/펼치기 — 아이폰에서 자막 편집 공간을 넓히려고 */
+.tl-toggle{
+  margin-left:6px; flex:0 0 auto; padding:3px 9px; border-radius:8px; cursor:pointer;
+  border:1px solid #2a3446; background:#141a24; color:#c3cee1;
+  font-size:10.5px; font-weight:700; white-space:nowrap;
+}
+.tl-toggle:hover{border-color:#4a5570; background:#1b2231; color:#fff}
+.timeline.tl-collapsed{height:auto!important; min-height:0}
+.timeline.tl-collapsed .tl-main{display:none}
+.timeline.tl-collapsed .tl-top{padding-bottom:4px; border-bottom:1px solid #1b2231}
 .tl-main{flex:1 1 auto; min-height:0; display:flex; overflow:hidden}
 .tl-labels{
   flex:0 0 74px; display:flex; flex-direction:column; gap:4px; padding:0 8px 5px;
@@ -268,11 +278,17 @@ canvas#preview.dragging{cursor:grabbing}
   flex:0 1 330px; min-width:170px; height:46px; background:#0d1119; border:1px solid #263042;
   border-radius:8px; padding:5px 8px; font-size:11.5px; line-height:1.4; resize:none;
 }
-.sticker-mini{display:flex; gap:4px; flex-wrap:nowrap}
-.sticker-mini button{
-  width:38px; height:38px; border-radius:8px; border:1px solid #232c3d; background:#151a24;
-  display:grid; place-items:center; padding:4px; flex:0 0 auto;
+.sticker-mini{
+  display:flex; gap:5px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
+  max-width:100%; min-width:0; padding:2px 0 5px; scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
+.sticker-mini::-webkit-scrollbar{display:none}
+.sticker-mini button{
+  width:42px; height:42px; border-radius:10px; border:1px solid #232c3d; background:#151a24;
+  display:grid; place-items:center; padding:4px; flex:0 0 auto; cursor:pointer;
+}
+.sticker-mini button:active{border-color:#8b6cff; background:#241d44}
 .sticker-mini button:hover{border-color:#4a5570; background:#1b2231}
 .sticker-mini img{width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
 .ratio-cards{display:flex; gap:7px; align-items:center}
@@ -295,6 +311,26 @@ canvas#preview.dragging{cursor:grabbing}
 .music-row .x{border:0; background:transparent; color:#7c8698; font-size:12px; padding:0 2px}
 .music-row .x:hover{color:var(--rose)}
 .meter{height:3px; width:44px; border-radius:2px; background:linear-gradient(90deg,var(--mint),var(--accent)); opacity:.65}
+/* ---------- 음악 탭: BGM 프리셋 카드 ---------- */
+.bgm-strip{display:flex; gap:7px; overflow-x:auto; padding:2px 0 4px; max-width:100%; scrollbar-width:none}
+.bgm-strip::-webkit-scrollbar{display:none}
+.bgm-card{
+  flex:0 0 auto; width:168px; padding:7px 8px 8px; border-radius:11px;
+  border:1px solid #2a3446; background:#141a24;
+}
+.bgm-card:hover{border-color:#3f4d67; background:#171f2c}
+.bgm-head{display:flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; color:#eef3fb; white-space:nowrap; overflow:hidden}
+.bgm-head span{font-size:14px; flex:0 0 auto}
+.bgm-head b{overflow:hidden; text-overflow:ellipsis}
+.bgm-sub{font-size:9px; color:#8b96ac; margin:2px 0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.bgm-btns{display:flex; gap:4px}
+.bgm-btns button{
+  flex:1 1 0; padding:5px 3px; border-radius:7px; border:1px solid #2f3a4f; background:#1a2231;
+  color:#cfd9ea; font-size:9.5px; font-weight:700; white-space:nowrap; cursor:pointer;
+}
+.bgm-btns button:hover{border-color:#4a5570; color:#fff}
+.bgm-btns button[data-act=bgmAdd]{background:linear-gradient(180deg,#3a2c78,#2b2158); border-color:#8b6cff; color:#fff}
+.bgm-btns button.busy{opacity:.5; pointer-events:none}
 .mini-note{font-size:10px; color:#6b7690; line-height:1.5}
 
 /* ---------- tab bar ---------- */
@@ -387,6 +423,31 @@ canvas#preview.dragging{cursor:grabbing}
   .tool-label{min-width:34px}
   .tt-area{flex:1 1 100%; min-width:0}
   .music-row{max-width:none}
+  /* 자막 탭: 타임라인을 접고 자막 편집 패널을 넓게 (자막 입력·글자체·크기/색·위치가 한눈에) */
+  body[data-panel-tab=text] .stage-inner{height:min(24vh,220px); padding:6px 10px 2px}
+  body[data-panel-tab=text] .timeline{height:auto}
+  body[data-panel-tab=text] .tools-panel{height:clamp(280px,55vh,452px); padding:9px 10px 10px; overscroll-behavior:contain}
+  body[data-panel-tab=text] .tool-row{gap:8px; margin-bottom:8px}
+  body[data-panel-tab=text] .tools-panel .pill{min-height:32px; padding:7px 11px; font-size:11.5px}
+  body[data-panel-tab=text] .tt-area{height:94px; font-size:15px; padding:9px 11px; line-height:1.45}
+  body[data-panel-tab=text] .font-strip{gap:8px; padding:1px 0 3px}
+  body[data-panel-tab=text] .font-chip{min-width:74px; min-height:46px; padding:7px 10px 6px}
+  body[data-panel-tab=text] .font-chip b{font-size:17px}
+  body[data-panel-tab=text] .font-chip span{font-size:9px}
+  body[data-panel-tab=text] .ctl{gap:6px; min-height:28px}
+  body[data-panel-tab=text] .ctl input[type=range]{width:60px}
+  /* 음악·이미지 탭: 고르는 화면이라 타임라인을 접고 목록을 넓게 */
+  body[data-panel-tab=music] .stage-inner{height:min(30vh,270px)}
+  body[data-panel-tab=music] .timeline{height:auto}
+  body[data-panel-tab=music] .tools-panel{height:clamp(240px,46vh,380px); padding:9px 10px 10px}
+  body[data-panel-tab=music] .tool-row{margin-bottom:9px}
+  body[data-panel-tab=music] .bgm-card{width:176px}
+  body[data-panel-tab=image] .stage-inner{height:min(32vh,290px)}
+  body[data-panel-tab=image] .timeline{height:auto}
+  body[data-panel-tab=image] .tools-panel{height:clamp(240px,46vh,380px); padding:9px 10px 10px}
+  body[data-panel-tab=image] .tool-row{margin-bottom:9px}
+  body[data-panel-tab=image] .sticker-mini{gap:7px}
+  body[data-panel-tab=image] .sticker-mini button{width:50px; height:50px}
   .toolbox{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; background:var(--panel)}
   .tabbar{flex:0 0 auto; height:calc(46px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom); margin-top:auto; position:sticky; bottom:0; z-index:9; box-shadow:0 -10px 26px rgba(0,0,0,.45)}
   .tabbar button.tab{font-size:9.5px}
@@ -464,6 +525,28 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .tl-content,.tl-content *{touch-action:none}
 .tl-content,.timeline .tbtn,.tabbar,.transport{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 canvas#preview{-webkit-touch-callout:none}
+/* 파일 선택 입력: iOS(사파리·홈 화면 앱)는 display:none/hidden 이면 피커가 안 열리거나 1장만 넘어오므로 화면 밖 1px로만 숨긴다 */
+.file-hidden{
+  position:fixed; left:-9999px; top:0; width:1px; height:1px; overflow:hidden;
+  opacity:0; pointer-events:none; border:0; padding:0; margin:0;
+}
+/* 타임라인 끝 ＋ / 빈 화면 파일 선택: 사진 여러 장인지 영상까지인지 바로 고르는 작은 메뉴 */
+.add-menu{
+  position:fixed; z-index:130; display:flex; flex-direction:column; gap:5px;
+  padding:7px; border-radius:14px; min-width:198px;
+  background:rgba(16,21,30,.98); border:1px solid #8b6cff;
+  box-shadow:0 16px 38px rgba(0,0,0,.6);
+}
+.add-menu[hidden]{display:none}
+.add-menu button{
+  display:grid; grid-template-columns:24px 1fr; gap:1px 9px; align-items:center;
+  padding:9px 11px; border-radius:10px; border:1px solid transparent; text-align:left;
+  background:rgba(139,108,255,.16); color:#eef1f8; font:inherit; cursor:pointer;
+}
+.add-menu button:hover,.add-menu button:active{background:rgba(139,108,255,.36); border-color:#8b6cff}
+.add-menu button span{grid-row:1 / 3; font-size:16px; text-align:center; line-height:1.1}
+.add-menu button b{font-size:13.5px; font-weight:800}
+.add-menu button i{font-style:normal; font-weight:600; font-size:11px; color:#9aa3b5}
 @media (max-width:900px){
   .topbar{padding-top:calc(7px + env(safe-area-inset-top)); min-height:calc(48px + env(safe-area-inset-top))}
   .studio{min-height:calc(100vh - 48px - env(safe-area-inset-top)); min-height:calc(100dvh - 48px - env(safe-area-inset-top))}
@@ -528,6 +611,7 @@ canvas#preview{-webkit-touch-callout:none}
     <div class="tl-top">
       <span class="tl-title">타임라인</span>
       <span class="tl-hint" id="hintClip">재생헤드를 옮기고 S 키로 자르세요</span>
+      <button class="tl-toggle" id="btnTlToggle" type="button" title="타임라인 접기·펼치기" aria-expanded="true">접기 ▾</button>
       <div class="zoom"><span>확대</span><input type="range" id="zoom" min="30" max="220" value="80"></div>
     </div>
     <div class="tl-main">
@@ -564,8 +648,16 @@ canvas#preview{-webkit-touch-callout:none}
 
 <div class="drop-overlay" id="dropOverlay"><div><span>⤒</span>영상·사진·음악을 여기에 놓으세요</div></div>
 
-<input type="file" id="fileMedia" accept="video/*,image/*" multiple hidden>
-<input type="file" id="fileAudio" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" hidden>
+<!-- 아이폰: 사진 다중 선택은 accept="image/*" 전용 입력으로 연다(영상+사진 섞인 accept면 1장만 오는 경우가 있음).
+     어느 입력이든 hidden/display:none 대신 .file-hidden(화면 밖 1px)로 숨긴다. -->
+<input type="file" id="fileMedia" class="file-hidden" accept="video/*,image/*" multiple>
+<input type="file" id="fileImages" class="file-hidden" accept="image/*" multiple>
+<input type="file" id="fileAudio" class="file-hidden" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac">
+
+<div class="add-menu" id="addMenu" hidden>
+  <button type="button" data-pick="images"><span>📷</span><b>사진 여러 장</b><i>사진첩에서 한 번에 여러 장</i></button>
+  <button type="button" data-pick="media"><span>🎬</span><b>영상·사진</b><i>영상도 함께 고르기</i></button>
+</div>
 
 <div class="modal" id="exportModal" hidden>
   <div class="modal-card">
@@ -1433,15 +1525,16 @@ function probeAudio(asset) {
     setTimeout(done, 5000);
   });
 }
-async function fileToAsset(file) {
+async function fileToAsset(file, forceKind) {
   const type = (file.type || '').toLowerCase();
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   let kind = type.startsWith('video') ? 'video' : type.startsWith('image') ? 'image' : type.startsWith('audio') ? 'audio' : null;
   if (!kind) {
     if (['mp4', 'mov', 'm4v', 'webm', 'ogv'].includes(ext)) kind = 'video';
-    else if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(ext)) kind = 'image';
+    else if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'heic', 'heif'].includes(ext)) kind = 'image';
     else if (['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac'].includes(ext)) kind = 'audio';
   }
+  if (!kind) kind = forceKind || null;
   if (!kind) return null;
   const url = URL.createObjectURL(file);
   const asset = { id: uid('m'), kind, name: file.name.replace(/\.[^.]+$/, ''), url, size: file.size, thumb: '', duration: 0, aspect: kind === 'image' ? 1 : 9 / 16 };
@@ -1449,29 +1542,56 @@ async function fileToAsset(file) {
   else if (kind === 'image') await probeImage(asset);
   else await probeAudio(asset);
   if (!asset.duration && kind !== 'image') asset.duration = kind === 'audio' ? 10 : 5;
-  assets.set(asset.id, asset);
+  // 열리지 않는 사진(HEIC 등)은 목록에 남기지 않는다 — 부르는 쪽(addFiles)이 안내하고 다음 파일로 넘어간다
+  if (!(asset.broken && asset.kind === 'image')) assets.set(asset.id, asset);
   return asset;
 }
-async function addFiles(fileList, forceKind) {
+/* opts: { forceKind: 'audio'|'image', asOverlay: true } — 예전 호출(addFiles(list,'audio'))도 그대로 받는다 */
+async function addFiles(fileList, opts) {
+  const o = (typeof opts === 'string') ? { forceKind: opts } : (opts || {});
   const files = Array.from(fileList || []);
-  if (!files.length) return;
-  let added = 0, audioAdded = 0;
+  if (!files.length) return null;
+  let added = 0, audioAdded = 0, overlayAdded = 0, failed = 0, heicFailed = 0;
   pushHistory();
   for (const f of files) {
-    const asset = await fileToAsset(f);
-    if (!asset) { toast('지원하지 않는 파일이에요: ' + f.name, 'warn'); continue; }
+    let asset = null;
+    try {
+      asset = await fileToAsset(f, o.forceKind);   // 한 파일이 실패해도 루프 전체가 멈추지 않게
+    } catch (err) {
+      console.warn('fileToAsset 실패:', f && f.name, err);
+      asset = null;
+    }
+    if (!asset) { toast('지원하지 않는 파일이에요: ' + f.name, 'warn'); failed++; continue; }
+    if (asset.broken && asset.kind === 'image') {
+      const heic = /\.(heic|heif)$/i.test(f.name || '') || /hei[cf]/i.test(f.type || '');
+      if (heic) heicFailed++;
+      toast(heic
+        ? (f.name + ' — HEIC 사진은 이 브라우저에서 열 수 없어 건너뛰었어요.')
+        : (f.name + ' — 사진을 열 수 없어 건너뛰었어요.'), 'warn');
+      failed++;
+      continue;
+    }
     if (asset.kind === 'audio') {
       addAudioAsset(asset);
       audioAdded++;
+    } else if (o.asOverlay && asset.kind === 'image') {
+      addImageOverlay(asset.id);
+      overlayAdded++;
     } else {
       addClipFromAsset(asset);
       added++;
     }
   }
-  if (audioAdded && !added) { tab = 'music'; }
+  if (audioAdded && !added && !overlayAdded) { tab = 'music'; }
   renderAll();
-  if (added) toast(added + '개 클립을 타임라인에 추가했어요', 'ok');
-  if (audioAdded) toast('음악 트랙에 ' + audioAdded + '개를 추가했어요', 'ok');
+  const parts = [];
+  if (added) parts.push(added + '개 클립을 타임라인에 추가');
+  if (overlayAdded) parts.push('이미지 ' + overlayAdded + '개를 영상 위에 얹음');
+  if (audioAdded) parts.push('음악 ' + audioAdded + '개 추가');
+  if (failed) parts.push(failed + '개는 열 수 없어 건너뜀');
+  if (parts.length) toast(parts.join(' · '), failed ? 'warn' : 'ok');
+  if (heicFailed) setTimeout(() => toast('HEIC 사진은 브라우저에서 열 수 없어요. 아이폰 설정 > 카메라 > 포맷을 “높은 호환성”으로 바꾸면 JPG로 저장돼요.', 'warn'), 1500);
+  return { added, overlayAdded, audioAdded, failed }; 
 }
 
 /* ---------------- clip / audio creation ---------------- */
@@ -1556,6 +1676,136 @@ const STICKER_DEFS = [
       <path d="M268 236 C326 152 430 146 438 214 C444 268 344 300 262 268 Z" fill="url(#g)" stroke="#6A4CF0" stroke-width="12" stroke-linejoin="round"/>
       <path d="M232 268 L186 424 L244 386 L256 424 L268 386 L326 424 L280 268 Z" fill="#A98DFF" stroke="#6A4CF0" stroke-width="12" stroke-linejoin="round"/>
       <rect x="222" y="226" width="68" height="66" rx="20" fill="#C9B6FF" stroke="#6A4CF0" stroke-width="12"/>`
+  },
+  /* ---------- 행사·계절 스티커 ---------- */
+  {
+    key: 'cake', name: '생일케이크',
+    inner: `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD3E4"/><stop offset="1" stop-color="#F083AB"/></linearGradient></defs>
+      <ellipse cx="256" cy="452" rx="196" ry="28" fill="#000" opacity=".10"/>
+      <rect x="92" y="288" width="328" height="144" rx="26" fill="url(#g)" stroke="#D46C93" stroke-width="12"/>
+      <rect x="92" y="334" width="328" height="24" fill="#FFF2F7" opacity=".5"/>
+      <rect x="86" y="230" width="340" height="92" rx="28" fill="#FFF7FB" stroke="#D46C93" stroke-width="12"/>
+      <circle cx="150" cy="322" r="26" fill="#FFF7FB" stroke="#D46C93" stroke-width="10"/>
+      <circle cx="256" cy="326" r="30" fill="#FFF7FB" stroke="#D46C93" stroke-width="10"/>
+      <circle cx="362" cy="322" r="26" fill="#FFF7FB" stroke="#D46C93" stroke-width="10"/>
+      <rect x="246" y="150" width="20" height="92" rx="8" fill="#8FCBFF" stroke="#5E9FD8" stroke-width="8"/>
+      <path d="M256 88 C278 114 288 130 288 148 C288 167 274 180 256 180 C238 180 224 167 224 148 C224 130 234 114 256 88 Z" fill="#FFCF5C" stroke="#E8A326" stroke-width="8"/>
+      <circle cx="158" cy="374" r="9" fill="#FFD166"/><circle cx="214" cy="396" r="9" fill="#8B6CFF"/><circle cx="318" cy="396" r="9" fill="#7FF0D2"/><circle cx="366" cy="370" r="9" fill="#FF8FA8"/>`
+  },
+  {
+    key: 'balloon', name: '풍선',
+    inner: `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB3C7"/><stop offset="1" stop-color="#E8406B"/></linearGradient></defs>
+      <path d="M256 40 C340 40 404 108 404 194 C404 286 330 352 256 352 C182 352 108 286 108 194 C108 108 172 40 256 40 Z" fill="url(#g)" stroke="#C93058" stroke-width="12"/>
+      <path d="M256 352 L232 398 L280 398 Z" fill="#E8406B" stroke="#C93058" stroke-width="10" stroke-linejoin="round"/>
+      <path d="M256 398 C228 442 284 452 250 490" fill="none" stroke="#E7EBF3" stroke-width="8" stroke-linecap="round"/>
+      <path d="M168 126 C144 158 138 190 146 224" fill="none" stroke="#FFE3EA" stroke-width="16" stroke-linecap="round" opacity=".85"/>`
+  },
+  {
+    key: 'gift', name: '선물상자',
+    inner: `<rect x="100" y="232" width="312" height="196" rx="22" fill="#FFD79E" stroke="#E19B4B" stroke-width="12"/>
+      <rect x="84" y="170" width="344" height="78" rx="20" fill="#FFE9C9" stroke="#E19B4B" stroke-width="12"/>
+      <rect x="234" y="174" width="44" height="254" fill="#FF8AA6" stroke="#D9557B" stroke-width="10"/>
+      <path d="M256 172 C212 130 144 126 130 164 C118 198 196 234 256 200 Z" fill="#FF8AA6" stroke="#D9557B" stroke-width="12" stroke-linejoin="round"/>
+      <path d="M256 172 C300 130 368 126 382 164 C394 198 316 234 256 200 Z" fill="#FFA7BC" stroke="#D9557B" stroke-width="12" stroke-linejoin="round"/>
+      <circle cx="256" cy="188" r="22" fill="#FFD3DE" stroke="#D9557B" stroke-width="10"/>`
+  },
+  {
+    key: 'tree', name: '크리스마스트리',
+    inner: `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7FD9A6"/><stop offset="1" stop-color="#2E8C63"/></linearGradient></defs>
+      <rect x="236" y="374" width="40" height="78" rx="12" fill="#B0703C" stroke="#8A5228" stroke-width="10"/>
+      <path d="M256 60 L354 194 L158 194 Z" fill="url(#g)" stroke="#1F6B4C" stroke-width="12" stroke-linejoin="round"/>
+      <path d="M256 148 L388 294 L124 294 Z" fill="url(#g)" stroke="#1F6B4C" stroke-width="12" stroke-linejoin="round"/>
+      <path d="M256 246 L420 400 L92 400 Z" fill="url(#g)" stroke="#1F6B4C" stroke-width="12" stroke-linejoin="round"/>
+      <path d="M256 18 L272 54 L310 60 L282 88 L290 126 L256 106 L222 126 L230 88 L202 60 L240 54 Z" fill="#FFD75E" stroke="#E0A72A" stroke-width="8" stroke-linejoin="round"/>
+      <circle cx="198" cy="266" r="14" fill="#FF7A9B"/><circle cx="320" cy="338" r="14" fill="#8BC6FF"/><circle cx="256" cy="356" r="14" fill="#FFD75E"/><circle cx="168" cy="370" r="12" fill="#B79CFF"/>`
+  },
+  {
+    key: 'snow', name: '눈꽃',
+    inner: `<g stroke="#BFE9FF" stroke-width="24" stroke-linecap="round" fill="none" transform="translate(256 256)">
+        <g><line x1="0" y1="-180" x2="0" y2="180"/><line x1="0" y1="-180" x2="-54" y2="-126"/><line x1="0" y1="-180" x2="54" y2="-126"/><line x1="0" y1="-118" x2="-46" y2="-72"/><line x1="0" y1="-118" x2="46" y2="-72"/></g>
+        <g transform="rotate(60)"><line x1="0" y1="-180" x2="0" y2="180"/><line x1="0" y1="-180" x2="-54" y2="-126"/><line x1="0" y1="-180" x2="54" y2="-126"/><line x1="0" y1="-118" x2="-46" y2="-72"/><line x1="0" y1="-118" x2="46" y2="-72"/></g>
+        <g transform="rotate(120)"><line x1="0" y1="-180" x2="0" y2="180"/><line x1="0" y1="-180" x2="-54" y2="-126"/><line x1="0" y1="-180" x2="54" y2="-126"/><line x1="0" y1="-118" x2="-46" y2="-72"/><line x1="0" y1="-118" x2="46" y2="-72"/></g>
+      </g>
+      <circle cx="256" cy="256" r="30" fill="#EAF8FF" stroke="#8FD4F5" stroke-width="12"/>`
+  },
+  {
+    key: 'newsun', name: '새해해',
+    inner: `<defs><radialGradient id="g" cx=".4" cy=".34" r=".72"><stop offset="0" stop-color="#FFF3AC"/><stop offset="1" stop-color="#FFB03A"/></radialGradient></defs>
+      <g stroke="#FFC85A" stroke-width="26" stroke-linecap="round">
+        <line x1="256" y1="32" x2="256" y2="92"/><line x1="256" y1="420" x2="256" y2="480"/>
+        <line x1="32" y1="256" x2="92" y2="256"/><line x1="420" y1="256" x2="480" y2="256"/>
+        <line x1="98" y1="98" x2="140" y2="140"/><line x1="372" y1="372" x2="414" y2="414"/>
+        <line x1="414" y1="98" x2="372" y2="140"/><line x1="140" y1="372" x2="98" y2="414"/>
+      </g>
+      <circle cx="256" cy="256" r="146" fill="url(#g)" stroke="#F0A020" stroke-width="12"/>
+      <circle cx="206" cy="236" r="17" fill="#8B5A1B"/><circle cx="306" cy="236" r="17" fill="#8B5A1B"/>
+      <path d="M206 296 C230 322 282 322 306 296" fill="none" stroke="#8B5A1B" stroke-width="16" stroke-linecap="round"/>
+      <circle cx="174" cy="282" r="18" fill="#FF9E5E" opacity=".45"/><circle cx="338" cy="282" r="18" fill="#FF9E5E" opacity=".45"/>`
+  },
+  /* ---------- 귀여운 꾸미기 스티커 ---------- */
+  {
+    key: 'rainbow', name: '무지개',
+    inner: `<g fill="none" stroke-linecap="round" stroke-width="34">
+        <path d="M92 366 A164 164 0 0 1 420 366" stroke="#FF8FA8"/>
+        <path d="M126 366 A130 130 0 0 1 386 366" stroke="#FFC764"/>
+        <path d="M160 366 A96 96 0 0 1 352 366" stroke="#7FDCA0"/>
+        <path d="M194 366 A62 62 0 0 1 318 366" stroke="#8FC7FF"/>
+      </g>
+      <g fill="#FFFFFF" stroke="#DCE6F3" stroke-width="10">
+        <circle cx="78" cy="378" r="42"/><circle cx="130" cy="398" r="32"/><circle cx="50" cy="402" r="28"/>
+        <circle cx="434" cy="378" r="42"/><circle cx="382" cy="398" r="32"/><circle cx="462" cy="402" r="28"/>
+      </g>`
+  },
+  {
+    key: 'bear', name: '곰돌이',
+    inner: `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D8A874"/><stop offset="1" stop-color="#A97645"/></linearGradient></defs>
+      <circle cx="150" cy="142" r="66" fill="url(#g)" stroke="#8A5B32" stroke-width="12"/>
+      <circle cx="362" cy="142" r="66" fill="url(#g)" stroke="#8A5B32" stroke-width="12"/>
+      <circle cx="150" cy="142" r="34" fill="#F0C9A0"/><circle cx="362" cy="142" r="34" fill="#F0C9A0"/>
+      <circle cx="256" cy="274" r="168" fill="url(#g)" stroke="#8A5B32" stroke-width="12"/>
+      <ellipse cx="256" cy="322" rx="90" ry="70" fill="#F6D8B4"/>
+      <circle cx="206" cy="240" r="16" fill="#4B3220"/><circle cx="306" cy="240" r="16" fill="#4B3220"/>
+      <ellipse cx="256" cy="290" rx="26" ry="20" fill="#4B3220"/>
+      <path d="M256 310 V330 M256 330 C240 350 216 348 208 334 M256 330 C272 350 296 348 304 334" fill="none" stroke="#4B3220" stroke-width="12" stroke-linecap="round"/>`
+  },
+  {
+    key: 'chick', name: '병아리',
+    inner: `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE980"/><stop offset="1" stop-color="#FFC53D"/></linearGradient></defs>
+      <path d="M256 110 C246 84 262 60 288 50 C276 76 280 96 298 110" fill="url(#g)" stroke="#E2A61F" stroke-width="12" stroke-linejoin="round"/>
+      <circle cx="256" cy="272" r="168" fill="url(#g)" stroke="#E2A61F" stroke-width="12"/>
+      <circle cx="206" cy="246" r="17" fill="#5A3A12"/><circle cx="306" cy="246" r="17" fill="#5A3A12"/>
+      <path d="M256 280 L224 306 L288 306 Z" fill="#FF9A3C" stroke="#E2761F" stroke-width="10" stroke-linejoin="round"/>
+      <ellipse cx="132" cy="330" rx="46" ry="34" fill="#FFDE72" stroke="#E2A61F" stroke-width="10"/>
+      <path d="M206 428 L190 468 M238 432 L238 472 M304 432 L304 472 M336 428 L352 468" fill="none" stroke="#E2761F" stroke-width="16" stroke-linecap="round"/>`
+  },
+  {
+    key: 'butterfly', name: '나비',
+    inner: `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC7E8"/><stop offset="1" stop-color="#B47BFF"/></linearGradient>
+        <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE1B0"/><stop offset="1" stop-color="#FF9BC4"/></linearGradient></defs>
+      <path d="M248 230 C198 128 94 106 72 166 C52 224 140 288 244 266 Z" fill="url(#g)" stroke="#8E5BD8" stroke-width="12" stroke-linejoin="round"/>
+      <path d="M264 230 C314 128 418 106 440 166 C460 224 372 288 268 266 Z" fill="url(#g)" stroke="#8E5BD8" stroke-width="12" stroke-linejoin="round"/>
+      <path d="M248 274 C188 292 118 356 144 404 C168 448 232 396 256 316 Z" fill="url(#g2)" stroke="#D2698F" stroke-width="12" stroke-linejoin="round"/>
+      <path d="M264 274 C324 292 394 356 368 404 C344 448 280 396 256 316 Z" fill="url(#g2)" stroke="#D2698F" stroke-width="12" stroke-linejoin="round"/>
+      <ellipse cx="256" cy="290" rx="26" ry="98" fill="#5B3B7A"/>
+      <path d="M244 200 C228 168 206 152 186 148 M268 200 C284 168 306 152 326 148" fill="none" stroke="#5B3B7A" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="182" cy="146" r="12" fill="#5B3B7A"/><circle cx="330" cy="146" r="12" fill="#5B3B7A"/>`
+  },
+  {
+    key: 'clover', name: '네잎클로버',
+    inner: `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A6EBB2"/><stop offset="1" stop-color="#33A85C"/></linearGradient></defs>
+      <path d="M256 300 C250 356 258 408 268 452" fill="none" stroke="#2E9A52" stroke-width="22" stroke-linecap="round"/>
+      <g fill="url(#g)" stroke="#258A48" stroke-width="12">
+        <ellipse cx="190" cy="192" rx="80" ry="94" transform="rotate(-38 190 192)"/>
+        <ellipse cx="322" cy="192" rx="80" ry="94" transform="rotate(38 322 192)"/>
+        <ellipse cx="190" cy="318" rx="80" ry="94" transform="rotate(38 190 318)"/>
+        <ellipse cx="322" cy="318" rx="80" ry="94" transform="rotate(-38 322 318)"/>
+      </g>
+      <circle cx="256" cy="256" r="22" fill="#258A48"/>`
+  },
+  {
+    key: 'bubble', name: '말풍선',
+    inner: `<path d="M96 118 h320 a40 40 0 0 1 40 40 v168 a40 40 0 0 1 -40 40 H236 L152 466 L170 366 H96 a40 40 0 0 1 -40 -40 V158 a40 40 0 0 1 40 -40 Z" fill="#FFFFFF" stroke="#9FB3D1" stroke-width="14" stroke-linejoin="round"/>
+      <path d="M256 300 C226 276 190 250 190 216 C190 192 208 176 228 176 C242 176 250 184 256 194 C262 184 270 176 284 176 C304 176 322 192 322 216 C322 250 286 276 256 300 Z" fill="#FF7A9B" stroke="#E04F75" stroke-width="10"/>`
   }
 ];
 function svgDataUrl(inner) {
@@ -2019,9 +2269,10 @@ function editPanelHTML() {
   return `
     <div class="tool-row">
       <span class="tool-label">미디어</span>
-      <button class="pill primary" data-act="pickMedia">＋ 영상·사진</button>
+      <button class="pill primary" data-act="pickImages" title="사진첩에서 여러 장을 한 번에 고르기">＋ 사진 여러 장</button>
+      <button class="pill" data-act="pickMedia">＋ 영상·사진</button>
       <button class="pill" data-act="pickAudio">♪ 음악</button>
-      <div class="chip-strip">${list.length ? list.map(assetChip).join('') : '<span class="hint-inline">영상을 끌어다 놓거나 ＋로 추가하세요</span>'}</div>
+      <div class="chip-strip">${list.length ? list.map(assetChip).join('') : '<span class="hint-inline">사진은 ＋ 사진 여러 장으로 한 번에 고를 수 있어요</span>'}</div>
     </div>
     <div class="tool-row">
       <span class="tool-label">전체</span>
@@ -2083,8 +2334,8 @@ function imagePanelHTML() {
   const imgs = state.overlays.filter(o => o.kind === 'image');
   const ov = selectedOverlay() && selectedOverlay().kind === 'image' ? selectedOverlay() : null;
   const imageAssets = Array.from(assets.values()).filter(a => a.kind === 'image' && !a.sticker);
-  const stickers = `<div class="sticker-mini">${STICKER_DEFS.map(d =>
-    `<button data-sticker="${d.key}" title="${d.name} 추가"><img src="${svgDataUrl(d.inner)}" alt="${d.name}"></button>`).join('')}</div>`;
+  const stickers = `${STICKER_DEFS.map(d =>
+    `<button data-sticker="${d.key}" title="${d.name} 추가" aria-label="${d.name} 추가"><img src="${svgDataUrl(d.inner)}" alt="${d.name}"></button>`).join('')}`;
   const assetChips = imageAssets.length
     ? `<div class="chip-strip">${imageAssets.map(a =>
       `<button class="chip" data-act="addOverlayAsset" data-asset="${a.id}" title="영상 위에 얹기">
@@ -2106,16 +2357,469 @@ function imagePanelHTML() {
   return `
     <div class="tool-row">
       <span class="tool-label">스티커</span>
-      ${stickers}
-      <button class="pill" data-act="pickMedia">＋ PNG·JPG</button>
+      <div class="sticker-mini" id="stickerMini">${stickers}</div>
+    </div>
+    <div class="tool-row">
+      <span class="hint-inline">옆으로 넘기면 ${STICKER_DEFS.length}종 — 누르면 영상 위에 얹혀요</span>
+      <button class="pill" data-act="pickImagesOverlay" title="고른 이미지를 타임라인 클립이 아니라 영상 위에 바로 얹기">＋ PNG·JPG</button>
       ${assetChips}
-      <span class="hint-inline">별·하트·반짝·꽃·왕관·리본</span>
     </div>
     <div class="tool-row">
       <span class="tool-label">이미지</span>
       ${imgs.length ? `<div class="chip-strip">${imgs.map(overlayChip).join('')}</div>` : `<span class="hint-inline">아직 얹은 이미지가 없어요.</span>`}
     </div>
     ${controls}`;
+}
+
+/* ============================================================
+   BGM 프리셋 — 어린이집·유아 영상용, 저작권 걱정 없는 자체 합성 음악
+   OfflineAudioContext로 그린 뒤 16bit 스테레오 WAV Blob으로 만들어
+   일반 음악 파일과 똑같이 [음악] 트랙·미리보기·영상 내보내기에 쓰인다.
+   (6·7·8번은 퍼블릭 도메인 전통 선율 — 생일 축하 / 징글벨 / 새해 5음계)
+   ============================================================ */
+const BGM_SR = 44100;
+function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+const BGM_CH = {
+  C: [60, 64, 67], Cmaj7: [60, 64, 67, 71], C7: [60, 64, 67, 70],
+  Dm: [62, 65, 69], D: [62, 66, 69], D7: [62, 66, 69, 72],
+  Em: [64, 67, 71], E: [64, 68, 71],
+  F: [65, 69, 72], Fmaj7: [65, 69, 72, 76],
+  G: [67, 71, 74], G7: [67, 71, 74, 77], Am: [57, 60, 64], Am7: [57, 60, 64, 67],
+  Bm: [59, 62, 66], Bb: [58, 62, 65], Gm: [55, 58, 62], A: [57, 61, 64]
+};
+const BGM_PITCH = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function bgmNote(tok) {
+  const m = /^([A-G])([#b]?)(-?\d)$/.exec(tok || '');
+  if (!m) return null;
+  return 12 * (parseInt(m[3], 10) + 1) + BGM_PITCH[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+}
+/* "C5:.5 E5:.5 G5:1 | -:1" → {notes:[[beat,midi,dur]], beats} (| 는 마디 구분 표시일 뿐) */
+function bgmParse(str) {
+  const notes = [];
+  let t = 0;
+  for (const tok of String(str).trim().split(/\s+/)) {
+    if (!tok || tok === '|') continue;
+    const parts = tok.split(':');
+    const dur = parts[1] ? parseFloat(parts[1]) : 1;
+    if (!isFinite(dur) || dur <= 0) continue;
+    const m = bgmNote(parts[0]);
+    if (m != null) notes.push([t, m, dur]);
+    t += dur;
+  }
+  return { notes, beats: t };
+}
+let _bgmNoise = null;
+function bgmNoiseBuf(ac) {
+  if (_bgmNoise && _bgmNoise.sampleRate === ac.sampleRate) return _bgmNoise;
+  const n = Math.floor(ac.sampleRate * 0.5);
+  const b = ac.createBuffer(1, n, ac.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.6);
+  _bgmNoise = b;
+  return b;
+}
+/* 부드러운 어택 + 디케이 엔벨로프를 가진 배음 합성음 하나 */
+function bgmVoice(ac, dest, t, freq, o) {
+  o = o || {};
+  const peak = o.gain == null ? 0.18 : o.gain;
+  const atk = o.attack == null ? 0.006 : o.attack;
+  const hold = Math.max(0, o.dur || 0);
+  const tail = o.tail == null ? 0.26 : o.tail;
+  const life = Math.max(0.08, hold + tail);
+  const env = ac.createGain();
+  let node = env;
+  if (o.lp) {
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; f.Q.value = 0.7;
+    node.connect(f); node = f;
+  }
+  if (o.pan && ac.createStereoPanner) {
+    const p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, o.pan));
+    node.connect(p); p.connect(dest);
+  } else node.connect(dest);
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.exponentialRampToValueAtTime(Math.max(0.0003, peak), t + atk);
+  if (o.sustain) {
+    const off = Math.max(atk + 0.01, hold);
+    env.gain.setValueAtTime(Math.max(0.0003, peak), t + off);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + off + Math.max(0.05, tail));
+  } else {
+    env.gain.exponentialRampToValueAtTime(0.0001, t + life);
+  }
+  for (const h of (o.harm || [{ m: 1, g: 1, type: o.type || 'sine' }])) {
+    const osc = ac.createOscillator();
+    osc.type = h.type || o.type || 'sine';
+    osc.frequency.setValueAtTime(freq * (h.m || 1), t);
+    if (h.cents) osc.detune.setValueAtTime(h.cents, t);
+    if (o.vib) {
+      const lfo = ac.createOscillator();
+      lfo.frequency.value = o.vib.rate || 5;
+      const lg = ac.createGain(); lg.gain.value = o.vib.depth || 4;
+      lfo.connect(lg); lg.connect(osc.detune);
+      lfo.start(t); lfo.stop(t + life + 0.05);
+    }
+    const g = ac.createGain(); g.gain.value = h.g == null ? 1 : h.g;
+    osc.connect(g); g.connect(env);
+    osc.start(t); osc.stop(t + life + 0.05);
+  }
+  return env;
+}
+/* 짧은 잡음 타격(셰이커·탬버린·박수·스네어) */
+function bgmHit(ac, dest, t, o) {
+  o = o || {};
+  const src = ac.createBufferSource();
+  src.buffer = bgmNoiseBuf(ac);
+  const f = ac.createBiquadFilter();
+  f.type = o.type || 'bandpass';
+  f.frequency.value = o.freq || 6000;
+  f.Q.value = o.q || 0.9;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0003, o.gain == null ? 0.05 : o.gain), t + (o.attack || 0.003));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (o.dur || 0.09));
+  src.connect(f); f.connect(g);
+  if (o.pan && ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = o.pan; g.connect(p); p.connect(dest); }
+  else g.connect(dest);
+  src.start(t); src.stop(t + (o.dur || 0.09) + 0.03);
+}
+const BGM_AC = {
+  marimba(ac, d, t, m, dur, vel = 1, pan = 0) {
+    bgmVoice(ac, d, t, mtof(m), { dur: Math.max(0.05, dur), tail: 0.48, gain: 0.2 * vel, pan, attack: 0.004,
+      harm: [{ m: 1, g: 1, type: 'sine' }, { m: 3.98, g: 0.2, type: 'sine' }, { m: 9.2, g: 0.04, type: 'sine' }] });
+  },
+  glock(ac, d, t, m, dur, vel = 1, pan = 0) {
+    bgmVoice(ac, d, t, mtof(m), { dur: Math.max(0.05, dur), tail: 0.8, gain: 0.145 * vel, pan, attack: 0.003,
+      harm: [{ m: 1, g: 1, type: 'sine' }, { m: 2.76, g: 0.28, type: 'sine' }, { m: 5.4, g: 0.09, type: 'sine' }] });
+  },
+  pizz(ac, d, t, m, dur, vel = 1, pan = 0) {
+    bgmVoice(ac, d, t, mtof(m), { dur: Math.min(Math.max(0.05, dur), 0.32), tail: 0.15, gain: 0.17 * vel, pan, attack: 0.004,
+      harm: [{ m: 1, g: 1, type: 'triangle' }, { m: 2, g: 0.34, type: 'sine' }, { m: 3, g: 0.1, type: 'sine' }] });
+  },
+  flute(ac, d, t, m, dur, vel = 1, pan = 0) {
+    bgmVoice(ac, d, t, mtof(m), { dur: Math.max(0.12, dur), tail: 0.18, gain: 0.13 * vel, pan, attack: 0.06, sustain: true, vib: { rate: 5.2, depth: 6 },
+      harm: [{ m: 1, g: 1, type: 'sine' }, { m: 2, g: 0.16, type: 'sine' }, { m: 3, g: 0.05, type: 'triangle' }] });
+  },
+  horn(ac, d, t, m, dur, vel = 1, pan = 0) {
+    bgmVoice(ac, d, t, mtof(m), { dur: Math.max(0.1, dur), tail: 0.2, gain: 0.1 * vel, pan, attack: 0.035, sustain: true, lp: 2600,
+      harm: [{ m: 1, g: 1, type: 'sawtooth' }, { m: 2, g: 0.3, type: 'sawtooth' }, { m: 3, g: 0.12, type: 'triangle' }] });
+  },
+  bass(ac, d, t, m, dur, vel = 1) {
+    bgmVoice(ac, d, t, mtof(m), { dur: Math.max(0.08, dur), tail: 0.16, gain: 0.19 * vel, attack: 0.012,
+      harm: [{ m: 1, g: 1, type: 'triangle' }, { m: 2, g: 0.22, type: 'sine' }] });
+  },
+  pad(ac, d, t, m, dur, vel = 1, pan = 0) {
+    bgmVoice(ac, d, t, mtof(m), { dur: Math.max(0.4, dur), tail: 0.5, gain: 0.075 * vel, pan, attack: 0.45, sustain: true,
+      harm: [{ m: 1, g: 1, type: 'sine', cents: -6 }, { m: 1.002, g: 0.8, type: 'sine', cents: 6 }, { m: 2, g: 0.18, type: 'sine' }] });
+  },
+  shaker(ac, d, t, vel = 1) { bgmHit(ac, d, t, { freq: 7200, q: 0.7, gain: 0.028 * vel, dur: 0.06, pan: 0.25 }); },
+  tamb(ac, d, t, vel = 1) { bgmHit(ac, d, t, { freq: 5200, q: 0.5, gain: 0.04 * vel, dur: 0.14, pan: -0.2 }); },
+  sleigh(ac, d, t, vel = 1) { bgmHit(ac, d, t, { type: 'highpass', freq: 6400, gain: 0.035 * vel, dur: 0.1, pan: 0.3 }); },
+  clap(ac, d, t, vel = 1) { bgmHit(ac, d, t, { freq: 1800, q: 0.8, gain: 0.05 * vel, dur: 0.12, pan: 0 }); },
+  snare(ac, d, t, vel = 1) { bgmHit(ac, d, t, { freq: 2400, q: 0.8, gain: 0.045 * vel, dur: 0.1 }); },
+  kick(ac, d, t, vel = 1) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22 * vel, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(g); g.connect(d); o.start(t); o.stop(t + 0.2);
+  }
+};
+
+/* ---------- 곡 ---------- */
+const BGM_SONGS = {
+  sunny: {
+    bpm: 120, bars: 16, prog: ['C', 'Am', 'F', 'G'],
+    melody: [
+      'C5:.5 E5:.5 G5:1 A5:.5 G5:.5 E5:1 | F5:.5 A5:.5 C6:1 A5:1 G5:1 | C5:.5 E5:.5 G5:.5 A5:.5 C6:1 A5:1 | G5:.5 E5:.5 D5:1 C5:2',
+      'G5:.5 A5:.5 G5:1 E5:1 D5:1 | E5:.5 G5:.5 A5:1 G5:2 | A5:.5 G5:.5 E5:.5 D5:.5 C5:1 E5:1 | D5:.5 E5:.5 D5:1 C5:2'
+    ],
+    mel(ac, d, t, m, dur, vel) { BGM_AC.marimba(ac, d, t, m, dur, 1.15 * vel, -0.12); },
+    comp(ac, d, at, spb, ch) {
+      [0, 2].forEach(b => ch.forEach((m, j) => BGM_AC.marimba(ac, d, at + b * spb + j * 0.012, m, spb * 1.05, 0.4, (j - 1) * 0.24)));
+      ch.forEach((m, j) => BGM_AC.marimba(ac, d, at + 3.5 * spb + j * 0.01, m + 12, spb * 0.32, 0.22, (1 - j) * 0.18));
+    },
+    bass(ac, d, at, spb, ch) {
+      BGM_AC.bass(ac, d, at, ch[0] - 24, spb * 1.5, 0.95);
+      BGM_AC.bass(ac, d, at + 2 * spb, ch[1] - 24, spb * 1.2, 0.7);
+    },
+    perc(ac, d, at, spb) { for (let i = 0; i < 8; i++) BGM_AC.shaker(ac, d, at + i * spb * 0.5, i % 2 ? 1 : 0.5); }
+  },
+  picnic: {
+    bpm: 112, bars: 16, prog: ['G', 'C', 'D', 'G', 'Em', 'C', 'D', 'G'],
+    melody: [
+      'B5:.5 D6:.5 B5:1 G5:1 A5:1 | C6:.5 B5:.5 A5:1 G5:2 | E5:.5 G5:.5 A5:1 B5:1 D6:1 | B5:.5 A5:.5 G5:1 D5:2',
+      'D6:.5 C6:.5 B5:1 A5:1 G5:1 | A5:.5 B5:.5 A5:1 E5:2 | G5:.5 A5:.5 B5:1 D6:1 C6:1 | B5:.5 A5:.5 G5:2 -:1'
+    ],
+    mel(ac, d, t, m, dur, vel) { BGM_AC.glock(ac, d, t, m, dur, 1.1 * vel, 0.14); BGM_AC.pizz(ac, d, t, m - 12, dur, 0.35 * vel, -0.14); },
+    comp(ac, d, at, spb, ch) {
+      [0.5, 2.5].forEach(b => ch.forEach((m, j) => BGM_AC.pizz(ac, d, at + b * spb + j * 0.016, m, spb * 0.7, 0.5, (j - 1) * 0.2)));
+      ch.forEach((m, j) => BGM_AC.pizz(ac, d, at + j * 0.013, m, spb * 0.5, 0.32, (1 - j) * 0.16));
+    },
+    bass(ac, d, at, spb, ch) {
+      BGM_AC.bass(ac, d, at, ch[0] - 24, spb, 0.85);
+      BGM_AC.bass(ac, d, at + 2 * spb, ch[2] - 24, spb * 1.4, 0.65);
+    },
+    perc(ac, d, at, spb) { for (let i = 0; i < 4; i++) BGM_AC.shaker(ac, d, at + i * spb + spb * 0.5, 0.7); }
+  },
+  forest: {
+    bpm: 126, bars: 16, prog: ['F', 'Dm', 'Bb', 'C', 'F', 'Dm', 'Bb', 'C'],
+    melody: [
+      'F5:.5 A5:.5 C6:.5 A5:.5 F5:.5 A5:.5 C6:.5 A5:.5 | D6:.5 C6:.5 A5:.5 F5:.5 D5:1 -:1 | Bb5:.5 D6:.5 F6:.5 D6:.5 Bb5:.5 D6:.5 F6:.5 D6:.5 | C6:1 A5:1 F5:2',
+      'C6:.5 A5:.5 F5:.5 A5:.5 C6:.5 D6:.5 C6:.5 A5:.5 | Bb5:.5 A5:.5 G5:.5 F5:.5 E5:2 | F5:.5 G5:.5 A5:.5 Bb5:.5 C6:1 D6:1 | C6:.5 A5:.5 F5:2 -:1'
+    ],
+    mel(ac, d, t, m, dur, vel) { BGM_AC.glock(ac, d, t, m, dur, 1.05 * vel, 0.16); },
+    comp(ac, d, at, spb, ch) {
+      for (let i = 0; i < 4; i++) ch.forEach((m, j) => BGM_AC.pizz(ac, d, at + i * spb + j * 0.014, m, spb * 0.38, i % 2 ? 0.34 : 0.46, (j - 1) * 0.24));
+    },
+    bass(ac, d, at, spb, ch) {
+      BGM_AC.bass(ac, d, at, ch[0] - 12, spb * 0.9, 0.8);
+      BGM_AC.bass(ac, d, at + 2 * spb, ch[0] - 12, spb * 0.9, 0.62);
+    },
+    perc(ac, d, at, spb) {
+      for (let i = 0; i < 8; i++) BGM_AC.shaker(ac, d, at + i * spb * 0.5, i % 2 ? 0.85 : 0.4);
+      BGM_AC.tamb(ac, d, at + 2 * spb, 0.8);
+    }
+  },
+  waddle: {
+    bpm: 108, bars: 16, prog: ['D', 'G', 'A', 'D', 'Bm', 'G', 'A', 'D'],
+    melody: [
+      'F#5:.5 A5:.5 F#5:.5 D5:.5 E5:.5 F#5:.5 A5:1 | B5:.5 A5:.5 G5:.5 B5:.5 A5:1 G5:1 | F#5:.5 E5:.5 D5:.5 F#5:.5 A5:1 F#5:1 | E5:1 D5:3',
+      'A5:.5 F#5:.5 D5:.5 F#5:.5 A5:.5 B5:.5 A5:1 | G5:.5 B5:.5 G5:.5 E5:.5 D5:2 | F#5:.5 G5:.5 A5:.5 B5:.5 D6:1 B5:1 | A5:.5 F#5:.5 D5:2 -:1'
+    ],
+    mel(ac, d, t, m, dur, vel) { BGM_AC.pizz(ac, d, t, m, dur, 1.25 * vel, -0.1); },
+    comp(ac, d, at, spb, ch) {
+      [0, 2].forEach(b => ch.forEach((m, j) => BGM_AC.pizz(ac, d, at + b * spb + j * 0.015, m, spb * 0.4, 0.34, (j - 1) * 0.2)));
+    },
+    /* 아장아장 걸음 — 4분음표 워킹 베이스 */
+    bass(ac, d, at, spb, ch) {
+      const seq = [ch[0] - 24, ch[1] - 24, ch[2] - 24, ch[1] - 12];
+      seq.forEach((m, i) => BGM_AC.bass(ac, d, at + i * spb, m, spb * 0.55, i === 0 ? 1 : 0.66));
+    },
+    perc(ac, d, at, spb) {
+      BGM_AC.snare(ac, d, at + 1 * spb, 0.5); BGM_AC.snare(ac, d, at + 3 * spb, 0.55);
+      for (let i = 0; i < 8; i++) BGM_AC.shaker(ac, d, at + i * spb * 0.5, 0.34);
+    }
+  },
+  lullaby: {
+    bpm: 72, bars: 8, prog: ['C', 'Am', 'F', 'G'],
+    melody: [
+      'E5:2 G5:1 C6:1 | A5:1 C6:1 E6:2 | F5:2 A5:1 C6:1 | G5:2 B5:2',
+      'C6:1 B5:1 A5:1 G5:1 | A5:1 G5:1 E5:2 | F5:1 G5:1 A5:1 B5:1 | C6:4'
+    ],
+    mel(ac, d, t, m, dur, vel) {
+      BGM_AC.glock(ac, d, t, m, dur * 0.6, 0.85 * vel, 0.15);
+      BGM_AC.flute(ac, d, t, m - 12, dur, 0.55 * vel, 0);
+    },
+    /* 오르골 아르페지오 */
+    comp(ac, d, at, spb, ch) {
+      const arp = [ch[0], ch[1], ch[2], ch[0] + 12, ch[2], ch[1]];
+      for (let i = 0; i < 6; i++) BGM_AC.glock(ac, d, at + i * spb * 0.5, arp[i] + 12, 0.5, 0.3, i % 2 ? 0.2 : -0.2);
+      ch.forEach((m, j) => BGM_AC.pad(ac, d, at + j * 0.02, m, spb * 3.8, 0.9, (j - 1) * 0.3));
+    },
+    bass(ac, d, at, spb, ch) { BGM_AC.bass(ac, d, at, ch[0] - 24, spb * 3.4, 0.5); },
+    perc() { }
+  },
+  birthday: {
+    bpm: 132, bars: 16, prog: ['C', 'C', 'F', 'C', 'C', 'F', 'G7', 'C'],
+    melody: [
+      '-:1 C4:.5 C4:.5 D4:1 C4:1 | F4:.5 E4:3.5 | C4:.5 C4:.5 D4:1 C4:1 | G4:.5 F4:3.5 | C4:.5 C4:.5 C5:1 A4:1 F4:1 | E4:.5 D4:3.5 | Bb4:.5 Bb4:.5 A4:1 F4:.5 G4:1.5 | F4:4'
+    ],
+    mel(ac, d, t, m, dur, vel) {
+      BGM_AC.horn(ac, d, t, m, Math.min(dur, 1.2), 1.05 * vel, -0.05);
+      BGM_AC.glock(ac, d, t, m + 12, Math.min(dur, 0.8), 0.7 * vel, 0.18);
+    },
+    comp(ac, d, at, spb, ch, bar) {
+      const punch = [0, 1.5, 2.5];
+      punch.forEach(b => ch.forEach((m, j) => BGM_AC.horn(ac, d, at + b * spb + j * 0.012, m, spb * 0.3, 0.36, (j - 1) * 0.25)));
+      if (bar % 4 === 0) [ch[0], ch[2]].forEach((m, j) => BGM_AC.glock(ac, d, at + j * 0.02, m + 12, 1, 0.5, 0.2));
+    },
+    bass(ac, d, at, spb, ch) {
+      BGM_AC.bass(ac, d, at, ch[0] - 24, spb * 0.9, 0.9);
+      BGM_AC.bass(ac, d, at + 2 * spb, ch[2] - 24, spb * 0.8, 0.7);
+    },
+    perc(ac, d, at, spb) {
+      BGM_AC.clap(ac, d, at + 1 * spb, 0.85); BGM_AC.clap(ac, d, at + 3 * spb, 0.85);
+      for (let i = 0; i < 8; i++) BGM_AC.shaker(ac, d, at + i * spb * 0.5, i % 2 ? 0.7 : 0.35);
+    }
+  },
+  christmas: {
+    bpm: 128, bars: 16, prog: ['C', 'C', 'C', 'C', 'F', 'C', 'G7', 'C'],
+    melody: [
+      'E5:1 E5:1 E5:2 | E5:1 E5:1 E5:2 | E5:1 G5:1 C5:1 D5:1 | E5:4 | F5:1 F5:1 F5:2 | F5:1 E5:1 E5:2 | E5:1 D5:1 D5:1 E5:1 | D5:2 G5:2'
+    ],
+    mel(ac, d, t, m, dur, vel) { BGM_AC.glock(ac, d, t, m, dur, 1.1 * vel, 0.12); },
+    comp(ac, d, at, spb, ch) {
+      [0, 2].forEach(b => ch.forEach((m, j) => BGM_AC.marimba(ac, d, at + b * spb + j * 0.012, m, spb * 0.9, 0.34, (j - 1) * 0.22)));
+      ch.forEach((m, j) => BGM_AC.glock(ac, d, at + 1.5 * spb + j * 0.01, m + 12, 0.4, 0.18, (1 - j) * 0.2));
+    },
+    bass(ac, d, at, spb, ch) { BGM_AC.bass(ac, d, at, ch[0] - 24, spb * 1.6, 0.8); },
+    perc(ac, d, at, spb) {
+      for (let i = 0; i < 8; i++) BGM_AC.sleigh(ac, d, at + i * spb * 0.5, i % 2 ? 0.7 : 0.4);
+      BGM_AC.tamb(ac, d, at + 2 * spb, 0.55);
+    }
+  },
+  newyear: {
+    bpm: 126, bars: 16, prog: ['C', 'Am', 'F', 'G', 'C', 'Am', 'G7', 'C'],
+    melody: [
+      'C5:.5 C5:.5 G5:1 E5:1 D5:1 | C5:1 D5:1 E5:2 | G5:.5 G5:.5 A5:1 G5:1 E5:1 | C5:2 G4:2 | C5:.5 D5:.5 E5:1 G5:1 A5:1 | G5:1 E5:1 D5:2 | C5:.5 E5:.5 G5:1 A5:1 C6:1 | A5:1 G5:1 C5:2'
+    ],
+    mel(ac, d, t, m, dur, vel) {
+      BGM_AC.horn(ac, d, t, m - 12, Math.min(dur, 0.9), 0.9 * vel, -0.06);
+      BGM_AC.marimba(ac, d, t, m, dur, 0.9 * vel, 0.14);
+    },
+    comp(ac, d, at, spb, ch) {
+      [0, 1.5, 2, 3.5].forEach(b => ch.forEach((m, j) => BGM_AC.marimba(ac, d, at + b * spb + j * 0.011, m, spb * 0.3, 0.3, (j - 1) * 0.2)));
+    },
+    bass(ac, d, at, spb, ch) {
+      BGM_AC.bass(ac, d, at, ch[0] - 24, spb * 0.8, 0.95);
+      BGM_AC.bass(ac, d, at + 2 * spb, ch[0] - 12, spb * 0.8, 0.75);
+    },
+    perc(ac, d, at, spb) {
+      for (let i = 0; i < 4; i++) BGM_AC.snare(ac, d, at + i * spb, i % 2 ? 0.7 : 0.45);
+      for (let i = 0; i < 4; i++) BGM_AC.kick(ac, d, at + i * spb, i % 2 ? 0.7 : 0.95);
+      BGM_AC.tamb(ac, d, at + 1 * spb, 0.6);
+    }
+  }
+};
+
+const BGM_PRESETS = [
+  { key: 'sunny', emoji: '🎈', name: '통통 햇살 놀이터', desc: '경쾌한 마림바 · 밝은 화음', seconds: 32 },
+  { key: 'picnic', emoji: '🌼', name: '아기새 소풍길', desc: '산뜻한 우쿨렐레 · 오르골', seconds: 34 },
+  { key: 'forest', emoji: '⭐', name: '반짝반짝 숲속 파티', desc: '통통 튀는 동요 · 가벼운 리듬', seconds: 30 },
+  { key: 'waddle', emoji: '🐾', name: '아장아장 꼬마 발걸음', desc: '귀여운 피치카토 · 통통 리듬', seconds: 35 },
+  { key: 'lullaby', emoji: '🌙', name: '포근한 낮잠 시간', desc: '잔잔한 오르골 자장가', seconds: 26 },
+  { key: 'birthday', emoji: '🎂', name: '생일 축하 파티', desc: '생일 축하 멜로디 · 팡파르', seconds: 29 },
+  { key: 'christmas', emoji: '🎄', name: '메리 크리스마스', desc: '징글벨 · 반짝이는 글로켄슈필', seconds: 30 },
+  { key: 'newyear', emoji: '🎍', name: '신나는 새해 인사', desc: '5음계 · 희망찬 행진곡', seconds: 30 }
+];
+
+/* 한 곡을 오프라인 그래프에 그린다 */
+function bgmRenderSong(ac, dest, song) {
+  const spb = 60 / song.bpm;
+  const bars = song.bars || 16;
+  const totalBeats = bars * 4;
+  const phrases = (song.melody || []).map(bgmParse).filter(p => p.notes.length);
+  let cursor = 0, pi = 0;
+  while (phrases.length && cursor < totalBeats - 0.001) {
+    const ph = phrases[pi % phrases.length];
+    for (const [bt, m, d] of ph.notes) {
+      const beat = cursor + bt;
+      if (beat >= totalBeats) continue;
+      song.mel(ac, dest, beat * spb, m, Math.min(d, totalBeats - beat) * spb, 1, 0);
+    }
+    cursor += ph.beats;
+    pi++;
+  }
+  for (let bar = 0; bar < bars; bar++) {
+    const at = bar * 4 * spb;
+    const ch = BGM_CH[song.prog[bar % song.prog.length]] || BGM_CH.C;
+    if (song.comp) song.comp(ac, dest, at, spb, ch, bar);
+    if (song.bass) song.bass(ac, dest, at, spb, ch, bar);
+    if (song.perc) song.perc(ac, dest, at, spb, ch, bar);
+  }
+  /* 마지막 여운 */
+  const endPad = BGM_CH[(song.prog[(bars - 1) % song.prog.length])] || BGM_CH.C;
+  endPad.forEach((m, j) => BGM_AC.pad(ac, dest, totalBeats * spb - spb * 2, m, spb * 2, 1.1, (j - 1) * 0.25));
+}
+
+/* AudioBuffer → 16bit 스테레오 WAV Blob */
+function bgmToWav(buf) {
+  const chs = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
+  const bytes = 44 + len * chs * 2;
+  const ab = new ArrayBuffer(bytes), v = new DataView(ab);
+  const str = (off, s) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, bytes - 8, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, chs, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * chs * 2, true); v.setUint16(32, chs * 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, len * chs * 2, true);
+  const data = [];
+  for (let c = 0; c < chs; c++) data.push(buf.getChannelData(c));
+  let off = 44;
+  for (let i = 0; i < len; i++) {
+    for (let c = 0; c < chs; c++) {
+      let s = data[c][i];
+      s = s < -1 ? -1 : s > 1 ? 1 : s;
+      v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      off += 2;
+    }
+  }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+const bgmCache = new Map();   // key → {file, url}
+let bgmPreviewEl = null, bgmPreviewKey = null;
+async function bgmBuild(key) {
+  const p = BGM_PRESETS.find(x => x.key === key);
+  if (!p) return null;
+  if (bgmCache.has(key)) return bgmCache.get(key);
+  const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!AC) throw new Error('이 브라우저는 오프라인 오디오 렌더링을 지원하지 않아요');
+  const song = BGM_SONGS[key];
+  const ac = new AC(2, Math.ceil(BGM_SR * p.seconds), BGM_SR);
+  bgmRenderSong(ac, ac.destination, song);
+  const buf = await ac.startRendering();
+  const blob = bgmToWav(buf);
+  let file;
+  try { file = new File([blob], p.name + '.wav', { type: 'audio/wav', lastModified: Date.now() }); }
+  catch (err) { file = blob; file.name = p.name + '.wav'; }
+  const item = { file, url: URL.createObjectURL(blob), seconds: p.seconds };
+  bgmCache.set(key, item);
+  return item;
+}
+function stopBgmPreview() {
+  if (bgmPreviewEl) { try { bgmPreviewEl.pause(); } catch (e) { } bgmPreviewEl = null; }
+  bgmPreviewKey = null;
+  $$('.bgm-btns button[data-act=bgmPreview]').forEach(b => { b.textContent = '▶ 미리듣기'; });
+}
+async function previewBgm(key, btn) {
+  const playingSame = bgmPreviewKey === key && bgmPreviewEl && !bgmPreviewEl.paused;
+  stopBgmPreview();
+  if (playingSame) return;
+  const p = BGM_PRESETS.find(x => x.key === key);
+  if (!p) return;
+  const old = btn ? btn.textContent : '';
+  if (btn) btn.textContent = '… 준비 중';
+  try {
+    setPlaying(false);
+    const item = await bgmBuild(key);
+    const el = new Audio();
+    el.src = item.url;
+    el.volume = 0.9;
+    el.addEventListener('ended', () => { if (bgmPreviewEl === el) stopBgmPreview(); });
+    bgmPreviewEl = el; bgmPreviewKey = key;
+    await el.play();
+    if (btn) btn.textContent = '⏸ 멈춤';
+  } catch (err) {
+    console.warn('BGM 미리듣기 실패:', err);
+    toast('미리듣기를 열 수 없어요. 잠시 뒤 다시 시도해 주세요.', 'warn');
+    if (btn) btn.textContent = old || '▶ 미리듣기';
+  }
+}
+async function addBgmPreset(key, btn) {
+  const p = BGM_PRESETS.find(x => x.key === key);
+  if (!p) return null;
+  const old = btn ? btn.textContent : '';
+  if (btn) { btn.classList.add('busy'); btn.textContent = '… 만드는 중'; }
+  try {
+    const item = await bgmBuild(key);
+    const res = await addFiles([item.file], { forceKind: 'audio' });
+    if (res && res.audioAdded) toast('🎵 ' + p.name + ' — 음악 트랙에 넣었어요', 'ok');
+    return res;
+  } catch (err) {
+    console.warn('BGM 추가 실패:', err);
+    toast('음악을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', 'warn');
+    return null;
+  } finally {
+    if (btn) { btn.classList.remove('busy'); btn.textContent = old || '＋ 추가'; }
+  }
+}
+function bgmCardHTML(p) {
+  return `<div class="bgm-card">
+    <div class="bgm-head"><span>${p.emoji}</span><b>${esc(p.name)}</b></div>
+    <div class="bgm-sub">${esc(p.desc)} · ${Math.round(p.seconds)}초</div>
+    <div class="bgm-btns">
+      <button type="button" data-act="bgmPreview" data-bgm="${p.key}" title="미리듣기">▶ 미리듣기</button>
+      <button type="button" data-act="bgmAdd" data-bgm="${p.key}" title="음악 트랙에 추가">＋ 추가</button>
+    </div>
+  </div>`;
 }
 
 /* ---------------- panel: 음악 ---------------- */
@@ -2134,6 +2838,11 @@ function musicPanelHTML() {
   const lib = Array.from(assets.values()).filter(a => a.kind === 'audio' && !a.sticker);
   const libChips = lib.length ? `<div class="chip-strip">${lib.map(assetChip).join('')}</div>` : '';
   return `
+    <div class="tool-row">
+      <span class="tool-label">BGM</span>
+      <div class="bgm-strip">${BGM_PRESETS.map(bgmCardHTML).join('')}</div>
+    </div>
+    <div class="tool-row"><span class="hint-inline">▶로 미리 듣고 ＋로 음악 트랙에 넣으세요. 모두 이 앱에서 직접 만든 저작권 걱정 없는 음악이에요 (생일·크리스마스·새해는 퍼블릭 도메인 전통 선율).</span></div>
     <div class="tool-row">
       <button class="pill primary" data-act="pickAudio">＋ 음악 파일</button>
       <span class="hint-inline">MP3 · M4A · WAV</span>
@@ -2180,6 +2889,7 @@ function pickMimeLabel() {
 function renderRight() {
   const box = $('#toolsPanel');
   $$('#tabbar .tab').forEach(b => b.classList.toggle('on', b.dataset.tool === tab));
+  applyTabLayout();   // 모바일: 자막 탭이면 타임라인을 접어 편집 공간을 넓힌다
   let html = '';
   if (tab === 'text') html = textPanelHTML();
   else if (tab === 'image') html = imagePanelHTML();
@@ -2379,6 +3089,10 @@ toolsPanel.addEventListener('click', e => {
   if (!b) return;
   const act = b.dataset.act;
   if (act === 'pickMedia') $('#fileMedia').click();
+  else if (act === 'bgmPreview') previewBgm(b.dataset.bgm, b);
+  else if (act === 'bgmAdd') addBgmPreset(b.dataset.bgm, b);
+  else if (act === 'pickImages') { pendingAppendScroll = true; pickImages('clip'); }
+  else if (act === 'pickImagesOverlay') pickImages('overlay');
   else if (act === 'pickAudio') $('#fileAudio').click();
   else if (act === 'addText') addTextOverlay();
   else if (act === 'addAsset') {
@@ -2469,6 +3183,53 @@ function toggleTools(forceCollapse) {
   $('#btnCollapse').classList.toggle('up', collapse);
   setTimeout(() => fitPreview(), 180);
 }
+
+/* ---------------- 타임라인 접기 ↔ 자막 편집 공간 (모바일) ---------------- */
+let tlCollapsed = false, lastLayoutTab = null;
+function isNarrowScreen() { return window.innerWidth <= 820; }
+function setTlCollapsed(v) {
+  tlCollapsed = !!v;
+  const tl = document.querySelector('.timeline');
+  if (tl) tl.classList.toggle('tl-collapsed', tlCollapsed);
+  const b = $('#btnTlToggle');
+  if (b) {
+    b.textContent = tlCollapsed ? '펼치기 ▴' : '접기 ▾';
+    b.setAttribute('aria-expanded', String(!tlCollapsed));
+  }
+}
+/* 탭이 바뀔 때만 자동 적용 — 사용자가 [펼치기]를 누른 상태를 덮어쓰지 않는다 */
+function applyTabLayout() {
+  if (lastLayoutTab === tab) return;
+  lastLayoutTab = tab;
+  if (!isNarrowScreen()) {
+    setTlCollapsed(false);
+    document.body.removeAttribute('data-panel-tab');
+    return;
+  }
+  /* 자막·음악·이미지 탭은 고르고 쓰는 화면 — 타임라인을 접어 도구 영역을 넓힌다 */
+  const wide = (tab === 'text' || tab === 'music' || tab === 'image');
+  setTlCollapsed(wide);
+  if (wide) document.body.setAttribute('data-panel-tab', tab);
+  else document.body.removeAttribute('data-panel-tab');
+  setTimeout(() => fitPreview(), 80);
+  setTimeout(() => fitPreview(), 300);
+}
+$('#btnTlToggle').addEventListener('click', () => {
+  setTlCollapsed(!tlCollapsed);
+  setTimeout(() => fitPreview(), 80);
+  setTimeout(() => fitPreview(), 300);
+});
+toolsPanel.addEventListener('focusin', e => {
+  if (!isNarrowScreen()) return;
+  if (e.target && e.target.id === 'ovText') {
+    setTlCollapsed(true);
+    document.body.setAttribute('data-panel-tab', 'text');
+    setTimeout(() => fitPreview(), 120);
+  }
+});
+window.addEventListener('resize', () => {
+  if (!isNarrowScreen()) { document.body.removeAttribute('data-panel-tab'); setTlCollapsed(false); }
+});
 
 /* ---------------- timeline interactions ---------------- */
 let tlDrag = null;
@@ -2672,15 +3433,74 @@ canvas.addEventListener('dblclick', e => {
 });
 
 /* ---------------- files · drop ---------------- */
-$('#btnPickEmpty').addEventListener('click', () => $('#fileMedia').click());
-$('#fileMedia').addEventListener('change', e => {
-  const picked = Array.from(e.target.files || []);
-  e.target.value = '';
-  addFiles(picked).then(() => {
-    if (pendingAppendScroll) { pendingAppendScroll = false; setTimeout(() => { const sc = $('#tlScroll'); if (sc) sc.scrollLeft = sc.scrollWidth; }, 60); }
-  });
+/* ---------------- files · drop ----------------
+   아이폰(iOS 사파리·홈 화면 앱) 대응:
+   - 입력창은 display:none/hidden 대신 화면 밖 1px(.file-hidden)로 숨긴다 → 피커가 안 열리는 문제 방지
+   - 사진은 accept="image/*" 전용 #fileImages로 연다 → 사진첩 다중 선택이 1장으로 줄지 않게
+   - e.target.value='' 는 addFiles가 파일을 다 읽은 뒤(finally)에 한다 → 먼저 비우면 FileList가 비어 버림 */
+let imagePickMode = 'clip';   // 'clip' = 타임라인에, 'overlay' = 영상 위에 얹기
+function pickImages(mode) {
+  imagePickMode = mode === 'overlay' ? 'overlay' : 'clip';
+  try { $('#fileImages').value = ''; } catch (err) {}
+  $('#fileImages').click();
+}
+function scrollTimelineEnd() {
+  if (!pendingAppendScroll) return;
+  pendingAppendScroll = false;
+  setTimeout(() => { const sc = $('#tlScroll'); if (sc) sc.scrollLeft = sc.scrollWidth; }, 60);
+}
+async function handlePickedFiles(e, opts) {
+  const input = e.target;
+  const picked = Array.from(input.files || []);   // 파일 목록은 먼저 복사해 둔다
+  try {
+    if (picked.length) await addFiles(picked, opts);
+  } catch (err) {
+    console.warn('파일 추가 중 오류:', err);
+    toast('파일을 불러오다 문제가 생겼어요. 다시 선택해 주세요.', 'warn');
+  } finally {
+    try { input.value = ''; } catch (err) {}   // iOS: 파일을 다 읽은 뒤에 초기화
+    scrollTimelineEnd();
+  }
+}
+$('#fileMedia').addEventListener('change', e => handlePickedFiles(e, {}));
+$('#fileImages').addEventListener('change', e => {
+  const asOverlay = imagePickMode === 'overlay';
+  imagePickMode = 'clip';
+  handlePickedFiles(e, { asOverlay });
 });
-$('#fileAudio').addEventListener('change', e => { addFiles(e.target.files, 'audio'); e.target.value = ''; });
+$('#fileAudio').addEventListener('change', e => handlePickedFiles(e, { forceKind: 'audio' }));
+
+/* 타임라인 끝 ＋ / 빈 화면 파일 선택: 사진 여러 장 · 영상·사진 중 바로 고르는 메뉴 */
+const addMenu = $('#addMenu');
+function openAddMenu(anchor) {
+  if (!anchor || !addMenu) return;
+  addMenu.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  const mw = addMenu.offsetWidth || 200, mh = addMenu.offsetHeight || 108;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - mw / 2), Math.max(8, window.innerWidth - mw - 8));
+  let top = r.top - mh - 10;
+  if (top < 8) top = Math.min(r.bottom + 10, window.innerHeight - mh - 8);
+  addMenu.style.left = left + 'px';
+  addMenu.style.top = Math.max(8, top) + 'px';
+}
+function closeAddMenu() { if (addMenu) addMenu.hidden = true; }
+if (addMenu) {
+  addMenu.addEventListener('click', e => {
+    const b = e.target.closest('[data-pick]');
+    if (!b) return;
+    closeAddMenu();
+    const which = b.dataset.pick;
+    pendingAppendScroll = true;
+    if (which === 'images') pickImages('clip');
+    else if (which === 'media') { try { $('#fileMedia').value = ''; } catch (err) {} $('#fileMedia').click(); }
+  });
+  document.addEventListener('click', e => {
+    if (addMenu.hidden) return;
+    if (e.target.closest('#addMenu') || e.target.closest('#tlAdd') || e.target.closest('#btnPickEmpty')) return;
+    closeAddMenu();
+  }, true);
+}
+$('#btnPickEmpty').addEventListener('click', e => { openAddMenu(e.currentTarget); });
 
 const dropOverlay = $('#dropOverlay');
 let dragDepth = 0;
@@ -2721,8 +3541,7 @@ function bindCommon() {
   trackVideo.addEventListener('click', e => {
     if (!e.target.closest('#tlAdd')) return;
     e.preventDefault();
-    pendingAppendScroll = true;
-    $('#fileMedia').click();
+    openAddMenu(e.target.closest('#tlAdd'));   // 사진 여러 장 / 영상·사진 바로 고르기
   });
   $('#btnCloseModal').addEventListener('click', closeExportModal);
   $('#btnCancelExport').addEventListener('click', cancelExport);
@@ -3044,7 +3863,9 @@ function boot() {
   window.__editor = {
     state, assets, totalDuration, seekTo, renderAll, loadSample, splitAtPlayhead,
     handlePoints, hitOverlay, overlayMetrics, canvas, FONTS, fontDef, fontStack, loadFont,
-    clipById, addClipFromAsset, setClipDuration, clipMaxDuration,
+    clipById, addClipFromAsset, setClipDuration, clipMaxDuration, ensureSticker,
+    bgm: { presets: BGM_PRESETS, build: bgmBuild, add: addBgmPreset,
+           previewEl: () => bgmPreviewEl, stopPreview: stopBgmPreview }, tl: { collapsed: () => tlCollapsed, set: setTlCollapsed },
     bulkInfo: () => ({ bulkSpeed, photoDefault, lastTextFont }),
     setBulkSpeed: v => { bulkSpeed = v; },
     setPhotoDefault: v => { photoDefault = v; },
