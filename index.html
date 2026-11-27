@@ -2082,7 +2082,7 @@ const history = { past: [], future: [] };
 function snapshot() {
   return JSON.stringify({
     ratio: state.ratio,
-    clips: state.clips.map(c => ({ id: c.id, kind: c.kind, assetId: c.assetId, name: c.name, duration: c.duration, inPoint: c.inPoint, speed: c.speed, volume: c.volume, muted: c.muted, kb: c.kb || 'none' })),
+    clips: state.clips.map(c => ({ id: c.id, kind: c.kind, assetId: c.assetId, name: c.name, duration: c.duration, inPoint: c.inPoint, speed: c.speed, volume: c.volume, muted: c.muted, kb: c.kb || 'none', intro: !!c.intro, ending: !!c.ending })),
     overlays: state.overlays.map(o => ({ ...o })),
     audios: state.audios.map(a => ({ id: a.id, assetId: a.assetId, name: a.name, start: a.start, in: a.in, duration: a.duration, volume: a.volume, muted: a.muted, tpl: a.tpl })),
     globalVideoVolume: state.globalVideoVolume, globalVideoMuted: state.globalVideoMuted,
@@ -5851,7 +5851,7 @@ function projectData() {
     clips: state.clips.map(c => ({
       id: c.id, kind: c.kind, assetId: c.assetId, name: c.name, duration: c.duration,
       inPoint: c.inPoint || 0, speed: c.speed || 1, volume: c.volume == null ? 1 : c.volume,
-      muted: !!c.muted, kb: c.kb || 'none'
+      muted: !!c.muted, kb: c.kb || 'none', intro: !!c.intro, ending: !!c.ending
     })),
     overlays: state.overlays.map(o => ({ ...o })),
     audios: state.audios.map(a => ({
