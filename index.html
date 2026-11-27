@@ -3572,6 +3572,11 @@ function onAudioInput(t) {
   const valEl = t.parentElement.querySelector('.val');
   if (valEl && p === 'volume') valEl.textContent = pct(a.volume);
   applyAudioItem(a);
+  /* 시작·트림·길이를 바꿈 = 트랙 편집 → 재생 중이면 새 구간으로 다시 스케줄 */
+  if (p === 'start' || p === 'in' || p === 'duration') {
+    stopMusicNode(a);
+    if (state.playing) syncMusic(state.time);
+  }
   renderTimeline();
 }
 function onGlobalInput(t) {
@@ -4033,6 +4038,7 @@ window.addEventListener('pointerup', e => {
     updateHistoryButtons();
   }
   tlDrag = null;
+  if (dragKind === 'audio' && state.playing) { stopAllMusic(); syncMusic(state.time); }   // 음악 블록을 옮겼으면 새 위치로
   renderTimeline();
   // 음악 블록을 톡 치고 뗐을 때만 음악 탭(볼륨·길이 조절)으로 넘어간다
   if (dragKind === 'audio' && !dragMoved && audioById(state.selected && state.selected.id)) { tab = 'music'; renderRight(); }
@@ -4516,7 +4522,9 @@ async function startExport() {
   const graph = await ensureExportAudio();
   if (graph) {
     for (const c of state.clips) if (c.kind === 'video') { const v = ensureVideoEl(c); if (v) connectMediaEl(v); }
-    for (const a of state.audios) { const el = ensureAudioEl(a); if (el) connectMediaEl(el); }
+    for (const a of state.audios) {
+      if (a._legacy || (assets.get(a.assetId) || {})._decodeFailed) { const el = ensureAudioEl(a); if (el) connectMediaEl(el); }
+    }
     const at = graph.dest.stream.getAudioTracks()[0];
     if (at) stream.addTrack(at);
   }
