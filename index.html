@@ -16,6 +16,10 @@
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <title>초곡샬레 영상편집기 · 세로 숏폼 스튜디오</title>
+<!-- 자막 글자체: 구글 폰트(무료 한글 폰트). 인터넷이 없으면 기기 기본 글꼴로 자연스럽게 대체됩니다. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Cute+Font&family=Do+Hyeon&family=Dongle:wght@400;700&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Hi+Melody&family=Jua&family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;700;900&display=swap">
 <style>
 /* ============================================================
    초곡샬레 영상편집기 — 독자 다크 스튜디오 UI
@@ -399,6 +403,50 @@ canvas#preview.dragging{cursor:grabbing}
   .ratio-card{padding:5px 7px; font-size:10px}
 }
 
+/* ---------- 자막 글자체 선택 ---------- */
+.font-strip{display:flex; gap:6px; overflow-x:auto; padding:1px 0 3px; max-width:100%; scrollbar-width:none}
+.font-strip::-webkit-scrollbar{display:none}
+.font-chip{
+  flex:0 0 auto; min-width:64px; padding:5px 9px 4px; border:1px solid #2a3446; background:#141a24;
+  border-radius:9px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1.1;
+}
+.font-chip b{font-size:16px; font-weight:600; color:#fff; white-space:nowrap}
+.font-chip span{font-size:8.5px; color:#8b96ac; letter-spacing:.2px; white-space:nowrap}
+.font-chip:hover{border-color:#4a5570; background:#1b2231}
+.font-chip.on{border-color:var(--gold); background:#241f16; box-shadow:0 0 0 1px rgba(255,209,102,.4)}
+.font-chip.on span{color:#ffd166}
+
+/* ---------- 타임라인: 끝 ＋ 추가 · 선택 클립 🗑 · 길이 조절 손잡이 ---------- */
+.tl-add{
+  position:absolute; top:4px; height:34px; width:38px; border-radius:9px; z-index:4;
+  border:1.5px dashed #7a63e0; background:rgba(139,108,255,.18); color:#ded4ff;
+  font-size:19px; font-weight:700; line-height:1; display:grid; place-items:center; padding:0;
+  box-shadow:0 3px 12px rgba(0,0,0,.4);
+}
+.tl-add:hover{border-style:solid; background:rgba(139,108,255,.38); color:#fff}
+.clip-del{
+  position:absolute; right:15px; top:2px; z-index:6; width:21px; height:21px; padding:0;
+  border-radius:6px; border:1px solid #ff8ba0; background:rgba(56,14,22,.94); color:#ffd0d8;
+  font-size:10px; line-height:1; display:grid; place-items:center; box-shadow:0 2px 7px rgba(0,0,0,.55);
+}
+.clip-del:hover{background:#ff5f7a; color:#fff; border-color:#ffb3c0}
+.clip-handle{
+  position:absolute; top:0; bottom:0; width:13px; z-index:5; touch-action:none; cursor:ew-resize;
+  background:linear-gradient(180deg,rgba(139,108,255,.95),rgba(95,224,192,.92));
+  display:flex; align-items:center; justify-content:center;
+}
+.clip-handle:after{content:""; width:2px; height:15px; border-radius:2px; background:rgba(9,12,18,.8); box-shadow:3px 0 0 rgba(9,12,18,.8)}
+.clip-block.sel .clip-name{right:46px}
+.clip-handle.left{left:0; border-radius:5px 0 0 5px}
+.clip-handle.right{right:0; border-radius:0 5px 5px 0}
+.clip-handle:active{background:linear-gradient(180deg,#a98dff,#7ff0d2)}
+.tl-tip{
+  position:fixed; z-index:99; padding:4px 9px; border-radius:8px; pointer-events:none;
+  background:rgba(18,23,32,.96); border:1px solid #8b6cff; color:#fff;
+  font-size:11.5px; font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);
+}
+
 /* ---------- PWA: iOS 홈 화면 앱(standalone) 안전영역 ---------- */
 *{-webkit-tap-highlight-color:transparent}
 body{
@@ -517,7 +565,7 @@ canvas#preview{-webkit-touch-callout:none}
 <div class="drop-overlay" id="dropOverlay"><div><span>⤒</span>영상·사진·음악을 여기에 놓으세요</div></div>
 
 <input type="file" id="fileMedia" accept="video/*,image/*" multiple hidden>
-<input type="file" id="fileAudio" accept="audio/*" hidden>
+<input type="file" id="fileAudio" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" hidden>
 
 <div class="modal" id="exportModal" hidden>
   <div class="modal-card">
@@ -531,7 +579,7 @@ canvas#preview{-webkit-touch-callout:none}
       <button class="btn ghost" id="btnCancelExport">취소</button>
     </div>
     <div id="exportDone" hidden>
-      <video id="exportVideo" controls playsinline></video>
+      <video id="exportVideo" controls playsinline webkit-playsinline></video>
       <p class="export-info" id="exportInfo"></p>
       <a class="btn primary" id="downloadLink" download>⬇ 파일 다운로드</a>
     </div>
@@ -539,6 +587,7 @@ canvas#preview{-webkit-touch-callout:none}
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="tl-tip" id="tlTip" hidden></div>
 
 <script>
 'use strict';
@@ -579,6 +628,39 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 const FONT_STACK = '"Pretendard","Noto Sans CJK KR","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif';
+/* ---------------- 자막 글자체(폰트) 목록 ----------------
+   구글 폰트로 불러오고, 오프라인·미지원이면 아이폰/PC 기본 글꼴로 자연스럽게 대체된다. */
+const FONTS = [
+  { key: 'default', name: '기본 고딕', css: '"Pretendard","Noto Sans CJK KR","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif' },
+  { key: 'jua', name: '주아체', css: '"Jua","Apple SD Gothic Neo",sans-serif' },
+  { key: 'dongle', name: '동글체', css: '"Dongle","Apple SD Gothic Neo",sans-serif' },
+  { key: 'gamja', name: '감자꽃체', css: '"Gamja Flower","Apple SD Gothic Neo",sans-serif' },
+  { key: 'gaegu', name: '개구체', css: '"Gaegu","Apple SD Gothic Neo",sans-serif' },
+  { key: 'himelody', name: '하이멜로디', css: '"Hi Melody","Apple SD Gothic Neo",sans-serif' },
+  { key: 'cute', name: '귀여운폰트', css: '"Cute Font","Apple SD Gothic Neo",sans-serif' },
+  { key: 'nanumpen', name: '나눔손글씨 펜', css: '"Nanum Pen Script","Apple SD Gothic Neo",sans-serif' },
+  { key: 'dohyeon', name: '도현체', css: '"Do Hyeon","Apple SD Gothic Neo",sans-serif' },
+  { key: 'blackhan', name: '검은고딕', css: '"Black Han Sans","Apple SD Gothic Neo",sans-serif' },
+  { key: 'noto', name: '노토 산스', css: '"Noto Sans KR","Apple SD Gothic Neo",sans-serif' }
+];
+function fontDef(key) { return FONTS.find(f => f.key === key) || FONTS[0]; }
+function fontStack(ov) { return fontDef(ov && ov.fontFamily).css; }
+function fontCss(ov, weight, sizePx) { return `${weight || 800} ${sizePx}px ${fontStack(ov)}`; }
+const fontLoaded = new Set();
+function loadFont(key) {
+  const f = fontDef(key);
+  if (!document.fonts || !document.fonts.load) return Promise.resolve();
+  if (fontLoaded.has(f.key)) return Promise.resolve();
+  return Promise.all([
+    document.fonts.load(`400 32px ${f.css}`).catch(() => null),
+    document.fonts.load(`800 32px ${f.css}`).catch(() => null)
+  ]).then(() => { fontLoaded.add(f.key); }).catch(() => { });
+}
+function loadUsedFonts() {
+  const used = new Set(['default']);
+  for (const o of state.overlays) if (o.kind === 'text') used.add(o.fontFamily || 'default');
+  return Promise.all(Array.from(used).map(loadFont));
+}
 const RATIOS = {
   '9:16': { w: 1080, h: 1920, label: '9:16 세로' },
   '16:9': { w: 1920, h: 1080, label: '16:9 가로' },
@@ -609,6 +691,10 @@ let exportCancelled = false;
 let currentPlayingClip = null;
 let tab = 'edit';
 let inspectorFocusPending = null;
+let bulkSpeed = 1;        // 편집 탭 '전체 배속' 선택값
+let photoDefault = 3;     // 새 사진 기본 길이(초)
+let lastTextFont = 'default';
+let pendingAppendScroll = false;
 
 const canvas = $('#preview');
 const ctx = canvas.getContext('2d');
@@ -663,6 +749,7 @@ function ensureVideoEl(c) {
   v.preload = 'auto';
   v.playsInline = true;
   v.setAttribute('playsinline', '');
+  v.setAttribute('webkit-playsinline', '');
   v.setAttribute('muted', '');
   v.loop = false;
   v.className = 'offscreen-video';
@@ -925,7 +1012,7 @@ function overlayMetrics(g, W, H, ov) {
   if (ov.kind === 'text') {
     const fs = Math.max(6, (ov.size || 56) * k);
     const weight = ov.weight || 800;
-    g.font = `${weight} ${fs}px ${FONT_STACK}`;
+    g.font = fontCss(ov, weight, fs);
     const lines = String(ov.text == null ? '' : ov.text).split('\n');
     const lh = fs * (ov.lineHeight || 1.26);
     let tw = 0;
@@ -959,7 +1046,7 @@ function drawOverlay(g, W, H, ov) {
       g.lineWidth = ov.borderWidth * m.k;
       g.stroke();
     }
-    g.font = `${ov.weight || 800} ${m.fs}px ${FONT_STACK}`;
+    g.font = fontCss(ov, ov.weight || 800, m.fs);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillStyle = ov.color || '#ffffff';
@@ -1399,7 +1486,7 @@ function addClipFromAsset(asset) {
     speed: 1,
     volume: 1,
     muted: false,
-    duration: isImage ? 3 : Math.max(0.3, asset.duration || 3)
+    duration: isImage ? clamp(photoDefault || 3, 0.2, 60) : Math.max(0.3, asset.duration || 3)
   };
   state.clips.push(clip);
   layout();
@@ -1562,6 +1649,7 @@ function addTextOverlay(text) {
   const ov = {
     id: uid('o'), kind: 'text', text: text || '자막을 입력하세요',
     start: w.start, end: w.end, x: 0.5, y: 0.78,
+    fontFamily: lastTextFont,
     size: 62, color: '#ffffff', bg: '#0b0f16', bgOpacity: 0.55,
     borderColor: '#ffffff', borderWidth: 0, radius: 18, padX: 26, padY: 14,
     opacity: 1, rot: 0, weight: 800, lineHeight: 1.26, shadow: true,
@@ -1676,6 +1764,16 @@ function setClipSpeed(c, speed) {
   c.speed = Math.round(s * 100) / 100;
   c.duration = Math.max(0.1, consumed / c.speed);
 }
+/* 클립 길이 상한: 사진은 자유롭게(최대 60초), 영상은 남은 원본만큼 */
+function clipMaxDuration(c) {
+  if (!c) return 0.2;
+  if (c.kind === 'image') return 60;
+  return Math.max(0.2, (clipSourceLength(c) - (c.inPoint || 0)) / (c.speed || 1));
+}
+function setClipDuration(c, d) {
+  if (!c) return;
+  c.duration = clamp(Math.round((Number(d) || 0) * 100) / 100, 0.2, clipMaxDuration(c));
+}
 
 /* ---------------- sample project ---------------- */
 function makeDemoThumb() {
@@ -1716,7 +1814,7 @@ function loadSample() {
     },
     {
       id: uid('o'), kind: 'text', text: '오직, 아이\n오롯이, 지금', start: 0, end: 5,
-      x: 0.5, y: 0.735, size: 62, color: '#3f4a3c', bg: '#fffdf8', bgOpacity: 0.84,
+      x: 0.5, y: 0.735, fontFamily: 'jua', size: 62, color: '#3f4a3c', bg: '#fffdf8', bgOpacity: 0.84,
       borderColor: '#ffffff', borderWidth: 0, radius: 20, padX: 30, padY: 16,
       opacity: 1, rot: 0, weight: 800, lineHeight: 1.2, shadow: false, layer: 2
     },
@@ -1788,9 +1886,10 @@ function renderRuler(total, zoom) {
 function renderTimeline() {
   layout();
   const zoom = state.zoom;
-  const total = Math.max(totalDuration(), 1);
+  const dur = totalDuration();
+  const total = Math.max(dur, 1);
   const scW = $('#tlScroll').clientWidth || 700;
-  const width = Math.max(total * zoom + 140, scW - 18);
+  const width = Math.max(total * zoom + 230, scW - 18);
   tlContent.style.width = width + 'px';
   renderRuler(Math.max(total, (width - 40) / zoom), zoom);
 
@@ -1802,14 +1901,19 @@ function renderTimeline() {
     const thumb = c.kind === 'demo' ? DEMO_THUMB : (asset && asset.thumb ? asset.thumb : '');
     const sel = state.selected && state.selected.type === 'clip' && state.selected.id === c.id;
     const spd = c.speed && Math.abs(c.speed - 1) > 0.001 ? `<span class="badge speed">${c.speed}×</span>` : '';
+    // 선택한 클립: 양옆 길이 조절 손잡이(사진은 오른쪽만) + 우측 상단 🗑 삭제
+    const handles = sel ? `${c.kind === 'image' ? '' : `<span class="clip-handle left" data-handle="left" data-id="${c.id}" title="앞부분 잘라내기"></span>`}<span class="clip-handle right" data-handle="right" data-id="${c.id}" title="끌어서 길이 조절"></span>` : '';
+    const delBtn = sel && w >= 46 ? `<button class="clip-del" data-del="${c.id}" title="이 클립 삭제">🗑</button>` : '';
     return `<div class="clip-block${sel ? ' sel' : ''}" data-id="${c.id}" title="${esc(c.name)} · ${fmtTime(c.duration)}"
         style="left:${left.toFixed(1)}px;width:${Math.max(14, w - 2).toFixed(1)}px">
         ${thumb ? `<div class="clip-thumb" style="background-image:url('${thumb}')"></div>` : ''}
         <div class="clip-shade"></div>
+        ${handles}${delBtn}
         <div class="clip-name">${esc(c.name || '클립')}</div>
         <div class="clip-badges">${spd}<span class="badge">${fmtTime(c.duration)}</span></div>
       </div>`;
-  }).join('') + (state.clips.length ? '' : `<div class="track-empty">영상·사진을 끌어다 놓거나 샘플 클립으로 시작해 보세요</div>`);
+  }).join('') + `<button class="tl-add" id="tlAdd" style="left:${(dur * zoom + 10).toFixed(1)}px" title="타임라인 맨 끝에 사진·영상 추가">＋</button>`
+    + (state.clips.length ? '' : `<div class="track-empty">영상·사진을 끌어다 놓거나 샘플 클립으로 시작해 보세요</div>`);
 
   /* overlay track — 겹치는 자막·스티커는 레인을 나눠 모두 보이게 */
   const LANE_H = 14, LANE_TOP = 2;
@@ -1890,6 +1994,8 @@ function editPanelHTML() {
       ${c.kind === 'image' ? '<span class="hint-inline">사진은 길이만 조절</span>' : speedButtons(c)}
       ${c.kind === 'image' ? '' : ctl('속도', rng('clip', 'speed', 0.25, 4, 0.05, c.speed || 1) + valSpan((c.speed || 1) + '×'))}
       ${ctl('길이', num('clip', 'duration', 0.2, c.kind === 'image' ? 60 : Math.max(0.2, Math.round((clipSourceLength(c) - (c.inPoint || 0)) / (c.speed || 1) * 100) / 100), 0.05, Math.round(c.duration * 100) / 100) + valSpan('초'))}
+      <button class="pill" data-act="durMinus" title="0.5초 줄이기">−0.5초</button>
+      <button class="pill" data-act="durPlus" title="0.5초 늘리기">＋0.5초</button>
       ${c.kind === 'image' ? '' : ctl('시작', num('clip', 'inPoint', 0, Math.max(0, clipSourceLength(c) - 0.2), 0.1, Math.round((c.inPoint || 0) * 10) / 10) + valSpan('초'))}
       <button class="pill" data-act="clipLeft" title="앞 클립과 순서 바꾸기">◀ 순서</button>
       <button class="pill" data-act="clipRight" title="뒤 클립과 순서 바꾸기">순서 ▶</button>
@@ -1917,6 +2023,14 @@ function editPanelHTML() {
       <button class="pill" data-act="pickAudio">♪ 음악</button>
       <div class="chip-strip">${list.length ? list.map(assetChip).join('') : '<span class="hint-inline">영상을 끌어다 놓거나 ＋로 추가하세요</span>'}</div>
     </div>
+    <div class="tool-row">
+      <span class="tool-label">전체</span>
+      <span class="mini-note">배속</span>
+      <div class="speed-chips">${SPEED_STEPS.map(s => `<button data-act="bulkSpeed" data-speed="${s}" class="${Math.abs(bulkSpeed - s) < 0.001 ? 'on' : ''}">${s}×</button>`).join('')}</div>
+      <button class="pill primary" data-act="applySpeedAll" title="고른 배속을 모든 영상 클립에 한 번에 적용">영상 전체 적용</button>
+      ${ctl('사진 길이', num('bulk', 'photo', 0.5, 60, 0.5, photoDefault) + valSpan('초'))}
+      <button class="pill primary" data-act="applyPhotoAll" title="모든 사진 클립을 같은 길이로">사진 전체 적용</button>
+    </div>
     ${clipRow}`;
 }
 
@@ -1938,6 +2052,10 @@ function textPanelHTML() {
     <div class="tool-row">
       <button class="pill primary" data-act="addText">＋ 자막 추가</button>
       ${chips}
+    </div>
+    <div class="tool-row">
+      <span class="tool-label">글자체</span>
+      <div class="font-strip">${FONTS.map(f => `<button class="font-chip${(ov.fontFamily || 'default') === f.key ? ' on' : ''}" data-act="setFont" data-font="${f.key}" style='font-family:${f.css}' title="${f.name}로 쓰기"><b>가나다</b><span>${f.name}</span></button>`).join('')}</div>
     </div>
     <div class="tool-row">
       <textarea class="tt-area" id="ovText" data-ov="text" placeholder="자막을 입력하세요">${esc(ov.text || '')}</textarea>
@@ -2205,12 +2323,20 @@ function onGlobalInput(t) {
   if (valEl && (p === 'video' || p === 'music')) valEl.textContent = pct(p === 'video' ? state.globalVideoVolume : state.globalMusicVolume);
   applyAllClipAudio(); applyAllAudio();
 }
+function onBulkInput(t) {
+  if (t.dataset.bulk === 'photo') {
+    const v = parseFloat(t.value);
+    if (isNaN(v)) return;
+    photoDefault = clamp(v, 0.2, 120);
+  }
+}
 toolsPanel.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.ov) onOverlayInput(t);
   else if (t.dataset.clip) onClipInput(t);
   else if (t.dataset.audio) onAudioInput(t);
   else if (t.dataset.global) onGlobalInput(t);
+  else if (t.dataset.bulk) onBulkInput(t);
 });
 toolsPanel.addEventListener('change', e => {
   const t = e.target;
@@ -2219,6 +2345,7 @@ toolsPanel.addEventListener('change', e => {
       renderRight(); renderTimeline(); updateTimeUI();
     }
     if (t.dataset.audio || t.dataset.global) renderRight();
+    if (t.dataset.bulk) t.value = photoDefault;
   }
 });
 
@@ -2274,6 +2401,44 @@ toolsPanel.addEventListener('click', e => {
     renderAll();
     toast('배속 ' + c.speed + '× — 클립 길이 ' + c.duration.toFixed(2) + '초', 'ok');
   } else if (act === 'del') deleteSelected();
+  else if (act === 'setFont') {
+    const ov = selectedOverlay();
+    if (!ov || ov.kind !== 'text') return;
+    pushHistory();
+    ov.fontFamily = b.dataset.font;
+    lastTextFont = b.dataset.font;
+    loadFont(b.dataset.font).then(() => { drawNow(); });
+    renderRight(); drawNow();
+  }
+  else if (act === 'durMinus' || act === 'durPlus') {
+    const c = selectedClip();
+    if (!c) return;
+    pushHistory();
+    setClipDuration(c, c.duration + (act === 'durPlus' ? 0.5 : -0.5));
+    layout(); state.time = clamp(state.time, 0, totalDuration()); renderAll();
+    toast((c.kind === 'image' ? '사진 ' : '클립 ') + c.duration.toFixed(1) + '초', 'ok');
+  }
+  else if (act === 'bulkSpeed') {
+    bulkSpeed = parseFloat(b.dataset.speed) || 1;
+    Array.from(b.parentElement.querySelectorAll('button')).forEach(x => x.classList.toggle('on', x === b));
+    toast('배속 ' + bulkSpeed + '× 선택 — ‘영상 전체 적용’을 눌러 주세요');
+  }
+  else if (act === 'applySpeedAll') {
+    const vids = state.clips.filter(c => c.kind !== 'image');
+    if (!vids.length) { toast('적용할 영상 클립이 없어요.', 'warn'); return; }
+    pushHistory();
+    vids.forEach(c => setClipSpeed(c, bulkSpeed));
+    layout(); state.time = clamp(state.time, 0, totalDuration()); renderAll();
+    toast(vids.length + '개 영상에 ' + bulkSpeed + '× 를 한 번에 적용했어요 ⚡', 'ok');
+  }
+  else if (act === 'applyPhotoAll') {
+    const pics = state.clips.filter(c => c.kind === 'image');
+    if (!pics.length) { toast('적용할 사진이 없어요.', 'warn'); return; }
+    pushHistory();
+    pics.forEach(c => { c.duration = clamp(photoDefault, 0.2, 60); });
+    layout(); state.time = clamp(state.time, 0, totalDuration()); renderAll();
+    toast(pics.length + '장 사진을 ' + photoDefault + '초로 맞췄어요', 'ok');
+  }
   else if (act === 'split') splitAtPlayhead();
   else if (act === 'clipLeft') moveSelectedClip(-1);
   else if (act === 'clipRight') moveSelectedClip(1);
@@ -2307,6 +2472,15 @@ function toggleTools(forceCollapse) {
 
 /* ---------------- timeline interactions ---------------- */
 let tlDrag = null;
+function showTlTip(e, c) {
+  const tip = $('#tlTip');
+  if (!tip) return;
+  tip.textContent = (c.kind === 'image' ? '🖼 사진 ' : '🎞 영상 ') + c.duration.toFixed(1) + '초';
+  tip.hidden = false;
+  tip.style.left = Math.max(4, Math.min(window.innerWidth - 100, e.clientX + 14)) + 'px';
+  tip.style.top = Math.max(6, e.clientY - 38) + 'px';
+}
+function hideTlTip() { const t = $('#tlTip'); if (t) t.hidden = true; }
 tlContent.addEventListener('pointerdown', e => {
   if (exporting) return;
   const rect = tlContent.getBoundingClientRect();
@@ -2314,6 +2488,27 @@ tlContent.addEventListener('pointerdown', e => {
   const ovEl = e.target.closest('.ov-block');
   const auEl = e.target.closest('.audio-block');
   const clEl = e.target.closest('.clip-block');
+  if (e.target.closest('#tlAdd')) return;
+  const delEl = e.target.closest('[data-del]');
+  if (delEl) {
+    e.preventDefault();
+    const dc = clipById(delEl.dataset.del);
+    if (dc) { state.selected = { type: 'clip', id: dc.id }; deleteSelected(); }
+    return;
+  }
+  const hEl = e.target.closest('[data-handle]');
+  if (hEl) {
+    const hc = clipById(hEl.dataset.id);
+    if (!hc) return;
+    e.preventDefault();
+    if (!(state.selected && state.selected.type === 'clip' && state.selected.id === hc.id)) selectClip(hc.id);
+    tlDrag = {
+      kind: 'trim', side: hEl.dataset.handle, c: hc, x,
+      startDur: hc.duration, startIn: hc.inPoint || 0, moved: false, snap: snapshot()
+    };
+    showTlTip(e, hc);
+    return;
+  }
   if (ovEl) {
     const ov = overlayById(ovEl.dataset.id);
     if (!ov) return;
@@ -2339,6 +2534,25 @@ window.addEventListener('pointermove', e => {
   const rect = tlContent.getBoundingClientRect();
   const x = e.clientX - rect.left;
   if (tlDrag.kind === 'seek') { seekTo(x / state.zoom); return; }
+  if (tlDrag.kind === 'trim') {
+    const c = tlDrag.c;
+    const dt = (x - tlDrag.x) / state.zoom;
+    const spd = c.speed || 1;
+    if (tlDrag.side === 'right') {
+      setClipDuration(c, tlDrag.startDur + dt);
+    } else {
+      // 왼쪽 손잡이: 앞부분을 잘라내거나 되살린다 (영상만)
+      const d = clamp(dt, -(tlDrag.startIn / spd), tlDrag.startDur - 0.2);
+      c.inPoint = Math.max(0, Math.round((tlDrag.startIn + d * spd) * 100) / 100);
+      c.duration = Math.max(0.2, Math.round((tlDrag.startDur - d) * 100) / 100);
+    }
+    tlDrag.moved = true;
+    layout();
+    state.time = clamp(state.time, 0, totalDuration());
+    renderTimeline(); updateTimeUI(); drawNow();
+    showTlTip(e, c);
+    return;
+  }
   const dx = (x - tlDrag.x) / state.zoom;
   if (Math.abs(dx) < 0.015 && !tlDrag.moved) return;
   tlDrag.moved = true;
@@ -2358,6 +2572,7 @@ window.addEventListener('pointermove', e => {
 });
 window.addEventListener('pointerup', () => {
   if (!tlDrag) return;
+  hideTlTip();
   if (tlDrag.moved && tlDrag.snap) {
     history.past.push(tlDrag.snap);
     history.future.length = 0;
@@ -2458,7 +2673,13 @@ canvas.addEventListener('dblclick', e => {
 
 /* ---------------- files · drop ---------------- */
 $('#btnPickEmpty').addEventListener('click', () => $('#fileMedia').click());
-$('#fileMedia').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+$('#fileMedia').addEventListener('change', e => {
+  const picked = Array.from(e.target.files || []);
+  e.target.value = '';
+  addFiles(picked).then(() => {
+    if (pendingAppendScroll) { pendingAppendScroll = false; setTimeout(() => { const sc = $('#tlScroll'); if (sc) sc.scrollLeft = sc.scrollWidth; }, 60); }
+  });
+});
 $('#fileAudio').addEventListener('change', e => { addFiles(e.target.files, 'audio'); e.target.value = ''; });
 
 const dropOverlay = $('#dropOverlay');
@@ -2497,6 +2718,12 @@ function bindCommon() {
   $('#btnFullscreen').addEventListener('click', toggleFullscreen);
   ['#btnSample', '#btnSample2'].forEach(s => { const el = $(s); if (el) el.addEventListener('click', loadSample); });
   $('#btnExport').addEventListener('click', startExport);
+  trackVideo.addEventListener('click', e => {
+    if (!e.target.closest('#tlAdd')) return;
+    e.preventDefault();
+    pendingAppendScroll = true;
+    $('#fileMedia').click();
+  });
   $('#btnCloseModal').addEventListener('click', closeExportModal);
   $('#btnCancelExport').addEventListener('click', cancelExport);
   $('#zoom').addEventListener('input', e => {
@@ -2666,6 +2893,11 @@ async function startExport() {
   pauseAll();
   openExportModal();
 
+  // 자막 글자체가 준비된 뒤에 찍어야 영상 속 글씨가 미리보기와 같아진다 (오프라인이면 최대 1.5초만 기다림)
+  if (document.fonts && document.fonts.load) {
+    await Promise.race([loadUsedFonts(), new Promise(r => setTimeout(r, 1500))]).catch(() => { });
+  }
+
   const { w, h } = RATIOS[state.ratio];
   const ecv = document.createElement('canvas');
   ecv.width = w; ecv.height = h;
@@ -2804,9 +3036,18 @@ function boot() {
     new ResizeObserver(() => { fitPreview(); }).observe(holder);
   }
   window.addEventListener('resize', () => fitPreview());
+  // 자막 글자체가 늦게 도착하면(폰트 스왑) 캔버스를 다시 그린다
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { drawNow(); if (tab === 'text') renderRight(); });
+  }
+  loadUsedFonts().then(() => { drawNow(); if (tab === 'text') renderRight(); });
   window.__editor = {
     state, assets, totalDuration, seekTo, renderAll, loadSample, splitAtPlayhead,
-    handlePoints, hitOverlay, overlayMetrics, canvas,
+    handlePoints, hitOverlay, overlayMetrics, canvas, FONTS, fontDef, fontStack, loadFont,
+    clipById, addClipFromAsset, setClipDuration, clipMaxDuration,
+    bulkInfo: () => ({ bulkSpeed, photoDefault, lastTextFont }),
+    setBulkSpeed: v => { bulkSpeed = v; },
+    setPhotoDefault: v => { photoDefault = v; },
     historyInfo: () => ({ past: history.past.length, future: history.future.length })
   };
 }
