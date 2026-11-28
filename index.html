@@ -1149,6 +1149,9 @@ canvas#preview{-webkit-touch-callout:none}
         <button type="button" data-ev="picnic">소풍</button>
         <button type="button" data-ev="christmas">크리스마스</button>
         <button type="button" data-ev="graduation">졸업</button>
+        <button type="button" data-ev="newyear">새해 인사</button>
+        <button type="button" data-ev="seollal">설날</button>
+        <button type="button" data-ev="trip">졸업여행</button>
       </div>
     </div>
     <ul class="magic-steps">
@@ -2157,7 +2160,7 @@ const history = { past: [], future: [] };
 function snapshot() {
   return JSON.stringify({
     ratio: state.ratio,
-    clips: state.clips.map(c => ({ id: c.id, kind: c.kind, assetId: c.assetId, name: c.name, duration: c.duration, inPoint: c.inPoint, speed: c.speed, volume: c.volume, muted: c.muted, kb: c.kb || 'none', intro: !!c.intro, ending: !!c.ending })),
+    clips: state.clips.map(c => ({ id: c.id, kind: c.kind, assetId: c.assetId, name: c.name, duration: c.duration, inPoint: c.inPoint, speed: c.speed, volume: c.volume, muted: c.muted, kb: c.kb || 'none', intro: !!c.intro, ending: !!c.ending, tpl: c.tpl || '', introCfg: c.introCfg || null })),
     overlays: state.overlays.map(o => ({ ...o })),
     audios: state.audios.map(a => ({ id: a.id, assetId: a.assetId, name: a.name, start: a.start, in: a.in, duration: a.duration, volume: a.volume, muted: a.muted, tpl: a.tpl })),
     globalVideoVolume: state.globalVideoVolume, globalVideoMuted: state.globalVideoMuted,
@@ -3518,6 +3521,7 @@ function editPanelHTML() {
       <button class="pill" data-act="clipLeft" title="앞 클립과 순서 바꾸기">◀ 순서</button>
       <button class="pill" data-act="clipRight" title="뒤 클립과 순서 바꾸기">순서 ▶</button>
       <button class="pill" data-act="split">✂ 분할</button>
+      ${c.intro ? `<button class="pill" data-act="introEdit" title="이 소개화면의 제목·그림·길이를 다시 고칩니다">🪧 소개화면 고치기</button>` : ''}
       ${c.kind === 'video' ? '<button class="pill" data-act="splitClipAudio" title="이 클립의 소리만 음악 트랙으로 떼어 내기 (원본은 음소거)">🎵 소리 분리</button>' : ''}
       <button class="pill warn" data-act="del">🗑 삭제</button>
     </div>
@@ -3588,6 +3592,7 @@ function textPanelHTML() {
   }
   return `
     ${panelActionsHTML('text')}
+    ${ov.tpl ? `<div class="tool-row"><span class="hint-inline">🪄 템플릿 자막이에요 — 여기서 글자·글자체·색·배경·위치·크기·길이를 그대로 고치거나 <b style="color:#ffb8c2">🗑 삭제</b>할 수 있어요.</span></div>` : ''}
     <div class="tool-row">
       <button class="pill primary" data-act="addText">＋ 자막 추가</button>
       ${chips}
@@ -4298,7 +4303,7 @@ function templatePanelHTML() {
         <span class="tpl-emoji">${t.emoji}</span><b>${t.name}</b><i>${esc(t.title)}</i></button>`).join('')}</div>
     </div>
     <div class="tool-row">
-      <span class="hint-inline">하나를 누르면 어울리는 제목 자막 + 추천 스티커 + 내장 BGM이 한 번에 세팅돼요. 지금 만들고 있는 사진·영상은 그대로 두고 꾸미기만 더해요.</span>
+      <span class="hint-inline">하나를 누르면 어울리는 제목 자막 + 추천 스티커 + 내장 BGM이 한 번에 세팅돼요. 크리스마스·새해·설날·졸업여행은 <b>소개화면·엔딩 인사·페이드</b>까지 함께 들어가고, 올린 사진·영상은 그대로 둡니다. 배경음악은 <b>음악</b> 줄에 따로 들어가서 음악 탭이나 타임라인에서 꾹 눌러 바로 지울 수 있어요.</span>
     </div>`;
 }
 function pickMimeLabel() {
@@ -4779,7 +4784,8 @@ toolsPanel.addEventListener('click', e => {
   else if (act === 'resumeProject') restoreProject();
   else if (act === 'newProject') newProject();
   else if (act === 'voiceRecord') toggleVoiceRecord();
-  else if (act === 'introOpen') openIntroModal();
+  else if (act === 'introOpen') { introReplaceId = null; openIntroModal(); }
+  else if (act === 'introEdit') openIntroForSelected();
   else if (act === 'endingOpen') openEndingModal();
   else if (act === 'autoMagic') openMagicModal();
   else if (act === 'fitMusic') fitPhotosToMusic();
@@ -6109,9 +6115,91 @@ function reorderClipTo(c, idx) {
 const TEMPLATES = [
   { key: 'sports', emoji: '🏃', name: '운동회', title: '신나는 운동회', sub: '우리 모두 최고야!', sticker: 'crown', bgm: 'sunny', color: '#fffdf5', bg: '#2b6b4a' },
   { key: 'graduation', emoji: '🎓', name: '졸업', title: '졸업을 축하해', sub: '초곡샬레에서의 소중한 시간', sticker: 'star', bgm: 'lullaby', color: '#fff8ec', bg: '#3b2f63' },
-  { key: 'birthday', emoji: '🎂', name: '생일', title: '생일 축하해', sub: '행복한 하루 보내!', sticker: 'cake', bgm: 'birthday', color: '#fff4f6', bg: '#8a2b45' },
+  {
+    key: 'birthday', emoji: '🎂', name: '생일잔치', title: '생일 축하해', sub: '친구들과 함께하는 생일잔치',
+    sticker: 'cake', bgm: 'birthday', color: '#fff4f6', bg: '#8a2b45', season: true,
+    intro: { title: '생일잔치', plank: '초곡샬레어린이집', theme: 'birthday', dur: 3 },
+    sub2: '오늘의 주인공을 함께 축하해 주세요',
+    stickers: ['balloon', 'heart'],
+    ending: { month: '', msg: '생일 축하해! 사랑해' }
+  },
   { key: 'picnic', emoji: '🌿', name: '소풍·현장학습', title: '신나는 소풍', sub: '자연 속에서 놀아요', sticker: 'flower', bgm: 'picnic', color: '#f6fff6', bg: '#2f6b52' },
-  { key: 'christmas', emoji: '🎄', name: '크리스마스', title: '메리 크리스마스', sub: '산타할아버지가 오셨어요', sticker: 'tree', bgm: 'christmas', color: '#fff6f6', bg: '#7d1f2b' }
+  {
+    key: 'kizcafe', emoji: '🎪', name: '키즈카페', title: '신나는 키즈카페 놀이', sub: '신나게 뛰어놀았어요',
+    sticker: 'balloon', bgm: 'sunny', color: '#f6fbff', bg: '#25507a', season: true,
+    intro: { title: '신나는 키즈카페 놀이', plank: '초곡샬레어린이집', theme: 'birthday', dur: 3 },
+    sub2: '볼풀·미끄럼틀·트램폴린, 다 신나!',
+    stickers: ['rainbow', 'star'],
+    ending: { month: '', msg: '오늘도 신나게 놀았어요! 다음에 또 만나요' }
+  },
+  {
+    key: 'confidence', emoji: '🏆', name: '자존감 쑥쑥 대회', title: '자존감 쑥쑥 대회', sub: '우리 모두가 주인공',
+    sticker: 'crown', bgm: 'forest', color: '#fffdf2', bg: '#6b3f12', season: true,
+    intro: { title: '자존감 쑥쑥 대회', plank: '초곡샬레어린이집', theme: 'sports', dur: 3 },
+    sub2: '용기 한 스푼, 자신감 두 스푼!',
+    stickers: ['star', 'crown'],
+    ending: { month: '', msg: '자존감 쑥쑥! 모두 최고였어요' }
+  },
+  /* ---- v11: 시즌·명절·겨울·새해 원클릭 템플릿 ----
+     올린 사진·영상은 그대로 두고 앞뒤 소개화면·엔딩, 자막·스티커, 페이드, BGM만 세팅한다.
+     자막은 일반 state.overlays 자막과 똑같아서 자막 탭에서 글자·색·위치를 고치거나 지울 수 있고,
+     BGM은 state.audios 의 독립된 음악 트랙으로 들어가 언제든 지울 수 있다. */
+  {
+    key: 'christmas', emoji: '🎄', name: '크리스마스', title: '메리 크리스마스', sub: '산타할아버지가 오셨어요',
+    sticker: 'tree', bgm: 'christmas', color: '#fff6f6', bg: '#7d1f2b', season: true,
+    intro: { title: '메리 크리스마스', plank: '초곡샬레어린이집', theme: 'winter', dur: 3 },
+    sub2: '반짝반짝 우리들의 겨울 이야기',
+    stickers: ['snow', 'gift'],
+    ending: { month: '12월', msg: '메리 크리스마스! 따뜻한 겨울 보내세요' }
+  },
+  {
+    key: 'newyear', emoji: '🌅', name: '새해 인사', title: '새해 복 많이 받으세요', sub: '희망찬 새해가 밝았어요',
+    sticker: 'newsun', bgm: 'newyear', color: '#fffdf4', bg: '#7a4a12', season: true,
+    intro: { title: '새해 복 많이 받으세요', plank: '초곡샬레어린이집', theme: 'sunrise', dur: 3 },
+    sub2: '올 한 해도 건강하고 씩씩하게!',
+    stickers: ['star', 'heart'],
+    ending: { month: '1월', msg: '새해 복 많이 받으세요! 올해도 함께해요' }
+  },
+  {
+    key: 'seollal', emoji: '🧧', name: '설날', title: '즐거운 설날 보내세요', sub: '세배하고 복 많이 받아요',
+    sticker: 'ribbon', bgm: 'sunny', color: '#fff8ec', bg: '#8a3a1e', season: true,
+    intro: { title: '즐거운 설날 보내세요', plank: '초곡샬레어린이집', theme: 'lunar', dur: 3 },
+    sub2: '새해 첫날, 복주머니 가득 안고',
+    stickers: ['star', 'heart'],
+    ending: { month: '1월', msg: '즐거운 설날 보내세요! 복 많이 받으세요' }
+  },
+  {
+    key: 'day1', emoji: '☀️', name: '즐거운 하루 ①', title: '신나는 놀이', sub: '오늘도 신나게 놀았어요',
+    sticker: 'balloon', bgm: 'sunny', color: '#fffdf2', bg: '#2b6b4a', season: true,
+    intro: { title: '신나는 놀이', plank: '초곡샬레어린이집', theme: 'garden', dur: 3 },
+    sub2: '웃음이 가득한 우리들의 하루',
+    stickers: ['star', 'balloon'],
+    ending: { month: '', msg: '오늘도 즐거운 하루였어요! 내일 또 만나요' }
+  },
+  {
+    key: 'day2', emoji: '🌿', name: '즐거운 하루 ②', title: '따뜻한 바깥나들이', sub: '햇살 좋은 날, 함께 걸었어요',
+    sticker: 'flower', bgm: 'picnic', color: '#f7fff8', bg: '#2f6b52', season: true,
+    intro: { title: '따뜻한 바깥나들이', plank: '초곡샬레어린이집', theme: 'spring', dur: 3 },
+    sub2: '바람도 햇살도 다 좋은 날',
+    stickers: ['butterfly', 'flower'],
+    ending: { month: '', msg: '오늘 산책도 즐거웠어요! 또 나가요' }
+  },
+  {
+    key: 'day3', emoji: '💛', name: '즐거운 하루 ③', title: '친구와 함께 웃음', sub: '친구랑 있으면 더 즐거워요',
+    sticker: 'heart', bgm: 'forest', color: '#fff8f0', bg: '#8a4a2b', season: true,
+    intro: { title: '친구와 함께 웃음', plank: '초곡샬레어린이집', theme: 'party', dur: 3 },
+    sub2: '함께라서 더 환한 우리들의 하루',
+    stickers: ['heart', 'bear'],
+    ending: { month: '', msg: '친구와 함께라서 행복한 하루였어요' }
+  },
+  {
+    key: 'trip', emoji: '🎒', name: '졸업여행', title: '졸업여행', sub: '우리들의 특별한 여행',
+    sticker: 'rainbow', bgm: 'picnic', color: '#f7fff8', bg: '#2f6b52', season: true,
+    intro: { title: '졸업여행', plank: '초곡샬레어린이집', theme: 'spring', dur: 3 },
+    sub2: '함께라서 더 반짝인 우리들의 여행',
+    stickers: ['heart', 'crown'],
+    ending: { month: '2월', msg: '졸업을 축하해! 멋진 여행 되었길' }
+  }
 ];
 async function addBgmAt(key, start, dur, tplKey) {
   const item = await bgmBuild(key);
@@ -6131,7 +6219,14 @@ async function addBgmAt(key, start, dur, tplKey) {
   primeAudioAsset(asset);
   return a;
 }
+let tplBusy = false;   // 템플릿 하나를 넣는 동안에는 다른 템플릿을 겹쳐 누르지 않게
 async function applyTemplate(key, btn) {
+  if (tplBusy) { toast('템플릿을 넣는 중이에요 — 잠깐만 기다려 주세요', 'warn'); return null; }
+  tplBusy = true;
+  try { return await _applyTemplate(key, btn); }
+  finally { tplBusy = false; }
+}
+async function _applyTemplate(key, btn) {
   const tpl = TEMPLATES.find(t => t.key === key);
   if (!tpl) return null;
   if (btn) btn.classList.add('busy');
@@ -6143,31 +6238,93 @@ async function applyTemplate(key, btn) {
     });
   }
   layout();
+  /* ① 이전에 넣은 템플릿 꾸미기는 걷어낸다 — 시즌 템플릿은 다른 시즌 것까지 모두 교체 */
+  state.overlays = state.overlays.filter(o => (tpl.season ? !o.tpl : o.tpl !== key));
+  /* ② 시즌·명절 템플릿은 맨 앞 소개화면부터 — 직접 만든 소개화면은 그대로 두고,
+        예전 템플릿이 만든 소개화면은 새 그림으로 갈아끼운다 */
+  if (tpl.intro) {
+    const keep = { ...introState };
+    Object.assign(introState, {
+      title: tpl.intro.title, plank: tpl.intro.plank || '초곡샬레어린이집',
+      theme: tpl.intro.theme || 'garden', dur: clamp(tpl.intro.dur || 3, 2, 5), bgImg: null
+    });
+    const oldIntro = state.clips.find(c => c.intro && c.tpl);
+    if (oldIntro) await insertIntroCover({ silent: true, noHistory: true, replaceClip: oldIntro, tag: key });
+    else if (!state.clips.some(c => c.intro)) await insertIntroCover({ silent: true, noHistory: true, tag: key });
+    Object.assign(introState, keep);   // 사용자가 만들던 소개화면 설정은 되돌려 둔다
+    layout();
+  }
+  /* 소개화면이 있으면 그 뒤부터 자막·스티커를 얹는다(표지 위에 글자가 겹치지 않게) */
+  const introClip = state.clips.find(c => c.intro);
+  const from = introClip ? round2((introClip.start || 0) + introClip.duration) : 0;
   const total = Math.max(0.5, totalDuration());
-  state.overlays = state.overlays.filter(o => o.tpl !== key);
   let layer = state.overlays.reduce((m, o) => Math.max(m, o.layer || 0), 0);
   const sticker = ensureSticker(tpl.sticker);
   state.overlays.push({
-    id: uid('o'), tpl: key, kind: 'image', assetId: sticker.id, start: 0, end: total,
+    id: uid('o'), tpl: key, kind: 'image', assetId: sticker.id, start: from, end: total,
     x: 0.5, y: 0.255, width: 0.2, rot: 0, opacity: 1, shadow: true, layer: ++layer
   });
+  /* 시즌 템플릿은 어울리는 작은 스티커를 영상 구간에 나눠 배치 */
+  if (tpl.season && Array.isArray(tpl.stickers) && tpl.stickers.length) {
+    const span = Math.max(1, total - from);
+    const seg = span / tpl.stickers.length;
+    const spots = [[0.18, 0.62, -10], [0.82, 0.6, 11], [0.3, 0.32, 8], [0.7, 0.3, -8]];
+    tpl.stickers.forEach((sk, i) => {
+      const s = ensureSticker(sk);
+      const [x, y, rot] = spots[i % spots.length];
+      state.overlays.push({
+        id: uid('o'), tpl: key, kind: 'image', assetId: s.id,
+        start: round2(from + i * seg), end: round2(from + (i + 1) * seg),
+        x, y, width: 0.16, rot, opacity: 0.95, shadow: true, layer: ++layer
+      });
+    });
+  }
   state.overlays.push({
-    id: uid('o'), tpl: key, kind: 'text', text: tpl.title, vertical: false, start: 0, end: total,
+    id: uid('o'), tpl: key, kind: 'text', text: tpl.title, vertical: false, start: from, end: total,
     x: 0.5, y: 0.6, fontFamily: 'jua', size: 76, color: tpl.color, bg: tpl.bg, bgOpacity: 0.45,
     borderColor: '#ffffff', borderWidth: 0, radius: 24, padX: 32, padY: 18,
     opacity: 1, rot: 0, weight: 800, lineHeight: 1.2, shadow: true, layer: ++layer
   });
   state.overlays.push({
-    id: uid('o'), tpl: key, kind: 'text', text: tpl.sub, vertical: false, start: 0, end: total,
+    id: uid('o'), tpl: key, kind: 'text', text: tpl.sub, vertical: false, start: from, end: total,
     x: 0.5, y: 0.71, fontFamily: 'default', size: 38, color: '#ffffff', bg: '#0b0f16', bgOpacity: 0.34,
     borderColor: '#ffffff', borderWidth: 0, radius: 16, padX: 22, padY: 12,
     opacity: 1, rot: 0, weight: 700, lineHeight: 1.25, shadow: true, layer: ++layer
   });
+  if (tpl.sub2) {
+    state.overlays.push({
+      id: uid('o'), tpl: key, kind: 'text', text: tpl.sub2, vertical: false, start: from, end: total,
+      x: 0.5, y: 0.8, fontFamily: 'default', size: 30, color: '#fff6e8', bg: '#0b0f16', bgOpacity: 0.28,
+      borderColor: '#ffffff', borderWidth: 0, radius: 14, padX: 18, padY: 9,
+      opacity: 1, rot: 0, weight: 700, lineHeight: 1.25, shadow: true, layer: ++layer
+    });
+  }
+  /* ④ 시즌 템플릿은 맨 끝 엔딩 인사까지 — 직접 붙인 엔딩은 그대로, 템플릿 엔딩은 새 문구로 교체 */
+  if (tpl.ending) {
+    const keepEnd = { ...endingState };
+    Object.assign(endingState, {
+      cls: '초곡샬레어린이집', month: tpl.ending.month || '',
+      msg: tpl.ending.msg || '즐거웠어요! 다음에 또 만나요', dur: 3
+    });
+    const oldEnd = state.clips.find(c => c.ending && c.tpl);
+    if (oldEnd) await insertEndingCard({ silent: true, noHistory: true, replaceClip: oldEnd, tag: key });
+    else if (!state.clips.some(c => c.ending)) await insertEndingCard({ silent: true, noHistory: true, tag: key });
+    Object.assign(endingState, keepEnd);
+  }
+  /* 패널은 템플릿 탭에 그대로 둔다 — 이어서 다른 템플릿도 눌러 볼 수 있게 */
+  tab = 'template';
+  state.selected = null;
+  renderRight();
+  /* ⑤ 부드러운 페이드 전환 */
+  if (tpl.season && state.clips.length > 1) state.transition = { type: 'fade', dur: 0.45 };
+  layout();
+  /* ⑥ 어울리는 동요 BGM — 소개화면부터 엔딩까지 한 곡, 독립된 음악 트랙으로 들어가 언제든 지울 수 있다 */
+  const fullTotal = Math.max(1, totalDuration());
   let bgmAdded = false;
   if (!state.audios.some(a => !a.tpl && !a.magic && !a.voice)) {
-    state.audios = state.audios.filter(a => a.tpl !== key);
+    state.audios = state.audios.filter(a => !a.tpl);   // 이전 템플릿 곡은 걷어내고 새 곡 하나만
     try {
-      bgmAdded = !!(await addBgmAt(tpl.bgm, 0, total, key));
+      bgmAdded = !!(await addBgmAt(tpl.bgm, 0, fullTotal, key));
     } catch (err) { console.warn('템플릿 BGM을 만들지 못했어요:', err); }
   }
   layout();
@@ -6175,9 +6332,15 @@ async function applyTemplate(key, btn) {
   renderAll();
   if (btn) btn.classList.remove('busy');
   markDirty();
-  toast(bgmAdded
-    ? tpl.emoji + ' ' + tpl.name + ' 템플릿 — 제목 자막·스티커·배경음악을 넣었어요'
-    : tpl.emoji + ' ' + tpl.name + ' 템플릿 — 제목 자막·스티커를 넣었어요 (지금 깔린 음악은 그대로 뒀어요)', 'ok');
+  if (tpl.season) {
+    toast(tpl.emoji + ' ' + tpl.name + ' 템플릿 — 자막·스티커·엔딩' +
+      (bgmAdded ? '·배경음악까지 한 번에 넣었어요 · 음악은 음악 줄에서 꾹 누르면 지워져요'
+                : '을 넣었어요 (지금 깔린 음악은 그대로 뒀어요)'), 'ok', true);
+  } else {
+    toast(bgmAdded
+      ? tpl.emoji + ' ' + tpl.name + ' 템플릿 — 제목 자막·스티커·배경음악을 넣었어요'
+      : tpl.emoji + ' ' + tpl.name + ' 템플릿 — 제목 자막·스티커를 넣었어요 (지금 깔린 음악은 그대로 뒀어요)', 'ok');
+  }
   return true;
 }
 
@@ -6252,7 +6415,8 @@ function projectData() {
     clips: state.clips.map(c => ({
       id: c.id, kind: c.kind, assetId: c.assetId, name: c.name, duration: c.duration,
       inPoint: c.inPoint || 0, speed: c.speed || 1, volume: c.volume == null ? 1 : c.volume,
-      muted: !!c.muted, kb: c.kb || 'none', intro: !!c.intro, ending: !!c.ending
+      muted: !!c.muted, kb: c.kb || 'none', intro: !!c.intro, ending: !!c.ending,
+      tpl: c.tpl || '', introCfg: c.introCfg || null
     })),
     overlays: state.overlays.map(o => ({ ...o })),
     audios: state.audios.map(a => ({
@@ -6565,7 +6729,9 @@ const INTRO_THEMES = [
   { key: 'birthday', name: '생일 파티', short: '생일', wood: '#d19557', wood2: '#a06832', ink: '#4a2c20', plank: '#c78d51' },
   { key: 'sports', name: '운동회', short: '운동회', wood: '#bf8446', wood2: '#8d5a2a', ink: '#3f2a12', plank: '#b0763c' },
   { key: 'winter', name: '겨울·크리스마스', short: '겨울', wood: '#c39460', wood2: '#92673a', ink: '#3a2714', plank: '#b5854f' },
-  { key: 'party', name: '졸업·축하', short: '축하', wood: '#b98250', wood2: '#8a5a2f', ink: '#43280f', plank: '#ad7744' }
+  { key: 'party', name: '졸업·축하', short: '축하', wood: '#b98250', wood2: '#8a5a2f', ink: '#43280f', plank: '#ad7744' },
+  { key: 'sunrise', name: '새해·해돋이', short: '새해', wood: '#c9925a', wood2: '#96632f', ink: '#3f2a12', plank: '#bd854c' },
+  { key: 'lunar', name: '설날·명절', short: '설날', wood: '#b8763c', wood2: '#8c5322', ink: '#42280e', plank: '#ad6c34' }
 ];
 function ipRnd(seed) {
   let s = (seed || 1) >>> 0;
@@ -7153,6 +7319,85 @@ function ipScene(g, W, H, key) {
     ipSnow(g, W, H, 110, 5);
     return;
   }
+  if (key === 'sunrise') {
+    /* 새해 해돋이 — 보랏빛 새벽이 주황으로 밝아지는 들판 */
+    ipSky(g, W, H, '#2b2350', '#ffbf84');
+    ipSun(g, W * 0.5, H * 0.64, 96 * k, '#ffd88a', 'rgba(255,192,120,.55)');
+    ipRays(g, W * 0.5, H * 0.64, 300 * k, 18, 'rgba(255,206,140,.26)');
+    const rnd = ipRnd(23);
+    for (let i = 0; i < 34; i++) ipStar(g, W * rnd(), H * rnd() * 0.45, (3 + rnd() * 6) * k, 'rgba(255,240,210,' + (0.25 + rnd() * 0.5).toFixed(2) + ')');
+    ipHill(g, W, H, H * 0.69, H * 0.022, 'rgba(122,88,124,.55)', 0.6);
+    ipHill(g, W, H, H * 0.78, H * 0.016, 'rgba(74,52,84,.72)', 2.2);
+    g.fillStyle = '#5c4162';
+    g.beginPath();
+    g.moveTo(0, H); g.lineTo(0, H * 0.845);
+    g.quadraticCurveTo(W * 0.35, H * 0.815, W * 0.62, H * 0.85);
+    g.quadraticCurveTo(W * 0.84, H * 0.875, W, H * 0.845);
+    g.lineTo(W, H); g.closePath(); g.fill();
+    ipPine(g, W * 0.1, H * 0.9, 96 * k, '#3a2f4e', '#ffd9b0');
+    ipPine(g, W * 0.9, H * 0.89, 78 * k, '#3a2f4e', '#ffd9b0');
+    ipBird(g, W * 0.68, H * 0.26, 15 * k, 'rgba(60,40,60,.55)');
+    ipBird(g, W * 0.76, H * 0.22, 11 * k, 'rgba(60,40,60,.45)');
+    for (let i = 0; i < 10; i++) ipStar(g, W * (0.14 + (i % 5) * 0.18), H * (0.44 + Math.floor(i / 5) * 0.05), (5 + (i % 3) * 2) * k, 'rgba(255,236,190,.85)');
+    ipPaper(g, W, H, k, 24);
+    return;
+  }
+  if (key === 'lunar') {
+    /* 설날 — 따뜻한 한지빛 하늘에 기와집과 청사초롱 */
+    ipSky(g, W, H, '#fff8ea', '#ffdcaa');
+    const glow = g.createRadialGradient(W * 0.5, H * 0.3, 0, W * 0.5, H * 0.3, W * 0.75);
+    glow.addColorStop(0, 'rgba(255,238,190,.9)');
+    glow.addColorStop(1, 'rgba(255,214,170,0)');
+    g.fillStyle = glow;
+    g.fillRect(0, 0, W, H);
+    ipCloud(g, W * 0.2, H * 0.16, 42 * k, '#fffdf7', 0.9);
+    ipCloud(g, W * 0.8, H * 0.13, 34 * k, '#fffdf7', 0.8);
+    ipHill(g, W, H, H * 0.63, H * 0.03, 'rgba(196,152,108,.38)', 1.4);
+    ipHill(g, W, H, H * 0.72, H * 0.02, 'rgba(160,112,74,.45)', 2.8);
+    /* 기와집 */
+    const cx = W * 0.5, baseY = H * 0.885;
+    g.fillStyle = '#fdf4e4';
+    g.beginPath();
+    g.moveTo(cx - W * 0.3, baseY); g.lineTo(cx - W * 0.3, baseY - H * 0.15);
+    g.lineTo(cx + W * 0.3, baseY - H * 0.15); g.lineTo(cx + W * 0.3, baseY);
+    g.closePath(); g.fill();
+    g.fillStyle = '#9e4a32';
+    for (const dx of [-0.24, -0.08, 0.08, 0.24]) g.fillRect(cx + W * dx - 7 * k, baseY - H * 0.15, 14 * k, H * 0.15);
+    g.fillStyle = '#3f4a5c';
+    g.beginPath();
+    g.moveTo(cx - W * 0.45, baseY - H * 0.145);
+    g.quadraticCurveTo(cx - W * 0.26, baseY - H * 0.2, cx - W * 0.3, baseY - H * 0.285);
+    g.lineTo(cx + W * 0.3, baseY - H * 0.285);
+    g.quadraticCurveTo(cx + W * 0.26, baseY - H * 0.2, cx + W * 0.45, baseY - H * 0.145);
+    g.quadraticCurveTo(cx, baseY - H * 0.1, cx - W * 0.45, baseY - H * 0.145);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 5 * k;
+    g.beginPath(); g.moveTo(cx - W * 0.3, baseY - H * 0.283); g.lineTo(cx + W * 0.3, baseY - H * 0.283); g.stroke();
+    /* 청사초롱 두 개 */
+    for (const [lx, ly, lc] of [[0.17, 0.25, '#e2543f'], [0.83, 0.29, '#e2543f']]) {
+      const x = W * lx, y = H * ly;
+      g.strokeStyle = 'rgba(120,80,50,.45)'; g.lineWidth = 3 * k;
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, y - 38 * k); g.stroke();
+      g.fillStyle = lc;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x - 34 * k, y - 38 * k, 68 * k, 78 * k, 20 * k); else g.rect(x - 34 * k, y - 38 * k, 68 * k, 78 * k);
+      g.fill();
+      g.fillStyle = '#ffd166';
+      g.fillRect(x - 34 * k, y - 12 * k, 68 * k, 9 * k);
+      g.fillRect(x - 34 * k, y + 22 * k, 68 * k, 9 * k);
+      g.fillStyle = 'rgba(255,255,255,.55)';
+      g.fillRect(x - 12 * k, y - 30 * k, 8 * k, 64 * k);
+      g.strokeStyle = '#b8402c'; g.lineWidth = 4 * k;
+      for (let i = -1; i <= 1; i++) {
+        g.beginPath(); g.moveTo(x + i * 12 * k, y + 40 * k); g.lineTo(x + i * 12 * k, y + 62 * k); g.stroke();
+      }
+    }
+    ipConfetti(g, W, H, 30, ['#ffd166', '#ff9f7a', '#fff2d8'], 61, H * 0.06, H * 0.5);
+    ipGrassTuft(g, W * 0.06, H * 0.9, 30 * k, '#a8b86a', '#7f8f4a');
+    ipGrassTuft(g, W * 0.94, H * 0.9, 28 * k, '#a8b86a', '#7f8f4a');
+    ipPaper(g, W, H, k, 28);
+    return;
+  }
   /* party — 졸업·축하 */
   ipSky(g, W, H, '#fff3da', '#ffd0a8');
   const glow2 = g.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.4, W * 0.88);
@@ -7370,9 +7615,30 @@ function syncIntroUI() {
   if (bgBtn) bgBtn.classList.toggle('on', !!introState.bgImg);
   document.querySelectorAll('#introLen button').forEach(b => b.classList.toggle('on', Number(b.dataset.len) === introState.dur));
 }
+let introReplaceId = null;   // 소개화면 '고치기'로 열었을 때 — 새로 넣지 않고 이 클립을 갈아끼운다
+function openIntroForSelected() {
+  const c = selectedClip();
+  if (!c || !c.intro) return;
+  introReplaceId = c.id;
+  const cfg = c.introCfg || {};
+  Object.assign(introState, {
+    title: cfg.title != null ? cfg.title : (String(c.name || '').split('·')[1] || '').trim(),
+    plank: cfg.plank || '초곡샬레어린이집',
+    theme: cfg.theme || 'garden',
+    dur: clamp(c.duration || 3, 2, 5),
+    bgImg: null
+  });
+  const btn = document.getElementById('btnIntroInsert');
+  if (btn) btn.textContent = '✔ 이 소개화면 바꾸기';
+  openIntroModal();
+}
 function openIntroModal() {
   const md = document.getElementById('introModal');
   if (!md) return;
+  if (!introReplaceId) {
+    const btn = document.getElementById('btnIntroInsert');
+    if (btn) btn.textContent = '⬆ 타임라인 맨 앞에 넣기';
+  }
   md.hidden = false;
   const t = document.getElementById('introTitle');
   if (t) t.value = introState.title;
@@ -7386,6 +7652,9 @@ function openIntroModal() {
 function closeIntroModal() {
   const md = document.getElementById('introModal');
   if (md) md.hidden = true;
+  introReplaceId = null;
+  const ib = document.getElementById('btnIntroInsert');
+  if (ib) ib.textContent = '⬆ 타임라인 맨 앞에 넣기';
 }
 async function insertIntroCover(opts) {
   const silent = !!(opts && opts.silent);
@@ -7404,6 +7673,49 @@ async function insertIntroCover(opts) {
   const asset = await fileToAsset(file, 'image');
   if (!asset) { toast('첫 소개화면을 저장하지 못했어요.', 'warn'); return null; }
   const dur = clamp(Number(introState.dur) || 3, 2, 5);
+  const tag = (opts && opts.tag) || '';
+  /* 화면의 '고치기'로 열었으면 그 클립을 갈아끼운다 */
+  const repClip = (opts && opts.replaceClip) || (introReplaceId ? state.clips.find(c => c.id === introReplaceId) : null);
+  if (!(opts && opts.replaceClip) && repClip) {
+    opts = Object.assign({}, opts, { replaceClip: repClip });
+  }
+  /* 이미 있는 소개화면을 새 그림으로 갈아끼우기(템플릿을 바꿀 때) — 시간·순서는 그대로 둔다 */
+  if (opts && opts.replaceClip) {
+    if (!(opts && opts.noHistory)) pushHistory();
+    const c = opts.replaceClip;
+    c.assetId = asset.id; c.name = name; c.intro = true;
+    c.introCfg = { title: introState.title || '', plank: introState.plank || '초곡샬레어린이집', theme: introState.theme || 'garden' };
+    if (tag) c.tpl = tag;
+    /* 길이를 바꿨으면 뒤따르는 자막·음악을 그만큼 밀거나 당긴다 */
+    const s0 = c.start || 0, oldDur = c.duration || dur;
+    const delta = round2(dur - oldDur);
+    if (Math.abs(delta) > 0.001) {
+      const after = s0 + oldDur - 0.001;
+      for (const o of state.overlays) { if (o.start >= after) { o.start = round2(o.start + delta); o.end = round2(o.end + delta); } }
+      for (const a of state.audios) { if ((a.start || 0) >= after) a.start = round2((a.start || 0) + delta); }
+      c.duration = dur;
+    }
+    state.overlays = state.overlays.filter(o => !o.intro);   // 예전 반짝임은 걷어내고
+    /* 간판 양옆 반짝임을 새로 얹는다 */
+    let layer0 = state.overlays.reduce((m, o) => Math.max(m, o.layer || 0), 0);
+    const sp0 = ensureSticker('sparkle'), st0 = ensureSticker('star');
+    const e0 = round2(s0 + (c.duration || dur));
+    state.overlays.push({ id: uid('o'), kind: 'image', assetId: sp0.id, tpl: tag, intro: true, start: s0, end: e0, x: 0.2, y: 0.29, width: 0.1, rot: -12, opacity: 0.95, shadow: true, twinkle: true, layer: ++layer0 });
+    state.overlays.push({ id: uid('o'), kind: 'image', assetId: st0.id, tpl: tag, intro: true, start: s0, end: e0, x: 0.79, y: 0.23, width: 0.08, rot: 14, opacity: 0.9, shadow: true, twinkle: true, layer: ++layer0 });
+    introReplaceId = null;
+    const ib = document.getElementById('btnIntroInsert');
+    if (ib) ib.textContent = '⬆ 타임라인 맨 앞에 넣기';
+    layout();
+    state.selected = { type: 'clip', id: c.id };
+    tab = 'edit';
+    renderAll();
+    markDirty();
+    if (!silent) {
+      closeIntroModal();
+      toast('🪧 소개화면을 새 그림으로 바꿨어요', 'ok');
+    }
+    return c;
+  }
   if (!(opts && opts.noHistory)) pushHistory();
   /* 기존 자막·이미지·음악은 새 장면만큼 오른쪽으로 밀어 원래 영상과의 짝을 지킨다 */
   for (const o of state.overlays) { o.start = round2(o.start + dur); o.end = round2(o.end + dur); }
@@ -7412,12 +7724,14 @@ async function insertIntroCover(opts) {
     id: uid('c'), kind: 'image', assetId: asset.id, name: name, duration: dur,
     inPoint: 0, speed: 1, volume: 1, muted: false, kb: 'in', intro: true
   };
+  if (tag) clip.tpl = tag;
+  clip.introCfg = { title: introState.title || '', plank: introState.plank || '초곡샬레어린이집', theme: introState.theme || 'garden' };
   state.clips.unshift(clip);
   /* 반짝임 — 간판 양옆에 작은 빛이 천천히 깜박인다 */
   let layer = state.overlays.reduce((m, o) => Math.max(m, o.layer || 0), 0);
   const sp = ensureSticker('sparkle'), st2 = ensureSticker('star');
-  state.overlays.push({ id: uid('o'), kind: 'image', assetId: sp.id, start: 0, end: dur, x: 0.2, y: 0.29, width: 0.1, rot: -12, opacity: 0.95, shadow: true, twinkle: true, layer: ++layer });
-  state.overlays.push({ id: uid('o'), kind: 'image', assetId: st2.id, start: 0, end: dur, x: 0.79, y: 0.23, width: 0.08, rot: 14, opacity: 0.9, shadow: true, twinkle: true, layer: ++layer });
+  state.overlays.push({ id: uid('o'), kind: 'image', assetId: sp.id, tpl: tag, intro: true, start: 0, end: dur, x: 0.2, y: 0.29, width: 0.1, rot: -12, opacity: 0.95, shadow: true, twinkle: true, layer: ++layer });
+  state.overlays.push({ id: uid('o'), kind: 'image', assetId: st2.id, tpl: tag, intro: true, start: 0, end: dur, x: 0.79, y: 0.23, width: 0.08, rot: 14, opacity: 0.9, shadow: true, twinkle: true, layer: ++layer });
   layout();
   state.selected = { type: 'clip', id: clip.id };
   tab = 'edit';
@@ -7704,11 +8018,23 @@ async function insertEndingCard(opts) {
   const asset = await fileToAsset(file, 'image');
   if (!asset) { toast('엔딩 인사를 저장하지 못했어요.', 'warn'); return null; }
   const dur = clamp(Number(endingState.dur) || 3, 2, 5);
+  const tag = (opts && opts.tag) || '';
+  if (opts && opts.replaceClip) {
+    if (!(opts && opts.noHistory)) pushHistory();
+    const c = opts.replaceClip;
+    c.assetId = asset.id; c.name = nm; c.ending = true;
+    if (tag) c.tpl = tag;
+    layout();
+    renderAll();
+    markDirty();
+    return c;
+  }
   if (!(opts && opts.noHistory)) pushHistory();
   const clip = {
     id: uid('c'), kind: 'image', assetId: asset.id, name: nm, duration: dur,
     inPoint: 0, speed: 1, volume: 1, muted: false, kb: 'out', ending: true
   };
+  if (tag) clip.tpl = tag;
   state.clips.push(clip);
   layout();
   state.selected = { type: 'clip', id: clip.id };
@@ -7730,8 +8056,11 @@ const MAGIC_EVENTS = {
   sports: { name: '운동회', bgm: 'sunny', theme: 'sports' },
   birthday: { name: '생일', bgm: 'birthday', theme: 'birthday' },
   picnic: { name: '소풍', bgm: 'picnic', theme: 'spring' },
-  christmas: { name: '크리스마스', bgm: 'christmas', theme: 'winter' },
-  graduation: { name: '졸업', bgm: 'lullaby', theme: 'party' }
+  christmas: { name: '크리스마스', bgm: 'christmas', theme: 'winter', introTitle: '메리 크리스마스', ending: { month: '12월', msg: '메리 크리스마스! 따뜻한 겨울 보내세요' } },
+  graduation: { name: '졸업', bgm: 'lullaby', theme: 'party' },
+  newyear: { name: '새해 인사', bgm: 'newyear', theme: 'sunrise', introTitle: '새해 복 많이 받으세요', ending: { month: '1월', msg: '새해 복 많이 받으세요! 올해도 함께해요' } },
+  seollal: { name: '설날', bgm: 'sunny', theme: 'lunar', introTitle: '즐거운 설날 보내세요', ending: { month: '1월', msg: '즐거운 설날 보내세요! 복 많이 받으세요' } },
+  trip: { name: '졸업여행', bgm: 'picnic', theme: 'spring', introTitle: '졸업여행', ending: { month: '2월', msg: '졸업을 축하해! 멋진 여행 되었길' } }
 };
 function openMagicModal() {
   const md = document.getElementById('magicModal');
@@ -7760,16 +8089,25 @@ async function runAutoMagic() {
     layout();
     /* ② 맨 앞 소개화면 */
     if (!state.clips.some(c => c.intro)) {
-      introState.title = String(magicState.title || '').trim() || '우리들의 하루';
+      const keep = { ...introState };
+      introState.title = String(magicState.title || '').trim() || ev.introTitle || '우리들의 하루';
       introState.plank = '초곡샬레어린이집';
       introState.theme = ev.theme;
       await insertIntroCover({ silent: true, noHistory: true });
+      Object.assign(introState, keep);
     }
-    /* ③ 페이드 전환 · ④ 초곡샬레 이름표 */
+    /* ③ 새해·설날·크리스마스·졸업여행은 엔딩 인사까지 */
+    if (ev.ending && !state.clips.some(c => c.ending)) {
+      const keepEnd = { ...endingState };
+      Object.assign(endingState, { cls: '초곡샬레어린이집', month: ev.ending.month || '', msg: ev.ending.msg, dur: 3 });
+      await insertEndingCard({ silent: true, noHistory: true });
+      Object.assign(endingState, keepEnd);
+    }
+    /* ④ 페이드 전환 · 초곡샬레 이름표 */
     if (state.clips.length > 1) state.transition = { type: 'fade', dur: 0.45 };
     state.watermark.on = true;
     state.watermark.corner = 'br';
-    /* ⑤ 어울리는 동요 BGM — 소개화면부터 끝까지 */
+    /* ⑤ 어울리는 동요 BGM — 소개화면부터 끝까지, 음악 줄에서 바로 지울 수 있는 독립 트랙 */
     if (!state.audios.some(a => !a.tpl && !a.magic)) {
       const total = Math.max(1, totalDuration());
       const a = await addBgmAt(ev.bgm, 0, total, 'magic');
@@ -7782,7 +8120,7 @@ async function runAutoMagic() {
     seekTo(0);
     markDirty();
     closeMagicModal();
-    toast('✨ 1분 자동 완성 — 소개화면·사진 2.5초·페이드·BGM·이름표를 한 번에 넣었어요', 'ok', true);
+    toast('✨ 1분 자동 완성 — 소개화면·사진 2.5초·페이드' + (ev.ending ? '·엔딩 인사' : '') + '·BGM·이름표를 한 번에 넣었어요', 'ok', true);
   } catch (err) {
     console.warn('자동 완성 실패:', err);
     toast('자동 완성을 마치지 못했어요. 다시 시도해 주세요.', 'warn');
@@ -7806,6 +8144,7 @@ const HELP_TIPS = [
   '타임라인 음악 블록을 <b>꾹 누르면</b> 바로 삭제돼요 (실행 취소로 되돌릴 수 있어요).',
   '아래 <b>맨 끝 🗑 삭제</b> 탭은 지금 고른 사진·클립·자막·음악을 바로 지우고, 사진·클립은 타임라인에서 <b>꾹 눌러도</b> 지워져요.',
   '사진 클립을 톡 눌러 고르면 오른쪽에 <b>노란 손잡이</b>가 생겨요. 끌면 사진 길이가 <b>0.5초~60초</b> 안에서 늘어나거나 줄어들어요.',
+  '템플릿 탭에서 <b>크리스마스·새해·설날·생일잔치·키즈카페·자존감 대회·졸업여행·즐거운 하루</b>를 누르면 소개화면·엔딩·자막·스티커·BGM이 한 번에 들어가고, 자막은 자막 탭에서 그대로 고칠 수 있어요.',
   '편집을 마치고 <b>✓ 확인</b>을 누르면 선택이 풀리고 타임라인이 크게 펴져요.',
   '클립을 <b>끌어서 옆으로</b> 옮기면 장면 순서가 바뀌어요.',
   '앱을 닫아도 <b>자동 임시저장</b>돼서 첫 화면의 <b>이어서 편집하기</b>로 돌아올 수 있어요.'
@@ -7981,7 +8320,8 @@ function boot() {
       tab: () => { const b = document.querySelector('#tabbar .tab[data-tool=delete]'); if (b) b.click(); },
       armed: () => { const b = document.querySelector('#tabbar .tab[data-tool=delete]'); return !!b && b.classList.contains('armed'); },
       target: selectedTargetInfo, del: deleteTabHit, sync: syncDelTab,
-      lp: { ms: LP_MS, tol: LP_TOL, active: () => !!lpPress, cancel: lpCancel }
+      lp: { ms: LP_MS, tol: LP_TOL, active: () => !!lpPress, cancel: lpCancel },
+      tplBusy: () => tplBusy
     }
   };
 }
