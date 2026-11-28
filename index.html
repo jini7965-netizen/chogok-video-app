@@ -695,6 +695,24 @@ body[data-panel-tab=speed] .tools-panel.collapsed{height:0; padding-top:0; paddi
   body[data-panel-tab=speed] .ctl input[type=range]{width:92px}
   .tabbar button.tab[data-tool=speed]{font-size:9px; letter-spacing:-.3px}
 }
+/* ---------- v11: 하단 맨 끝 ‘삭제’ 탭 + 꾹 눌러 삭제 ---------- */
+.tabbar button.tab.tab-del{color:#e08b9b; border-left:1px solid #1b2230}
+.tabbar button.tab.tab-del .ico{opacity:.95}
+.tabbar button.tab.tab-del.armed{color:#ff6d84}
+.tabbar button.tab.tab-del.armed:before{content:""; position:absolute; inset:5px 7px; border-radius:9px; border:1px solid rgba(255,109,132,.3); background:linear-gradient(180deg,rgba(255,77,109,.22),rgba(255,77,109,.05))}
+.tabbar button.tab.tab-del.armed .ico{filter:drop-shadow(0 0 8px rgba(255,77,109,.75))}
+@media (max-width:900px){
+  /* 탭이 9개가 되어도 390px 폭에서 한 줄에 다 들어가게 — 글자·아이콘·접기 버튼을 조금 줄인다 */
+  .tabbar button.tab{font-size:8.7px; letter-spacing:-.2px}
+  .tabbar button.tab[data-tool=speed]{font-size:8.7px; letter-spacing:-.35px}
+  .tabbar button.tab .ico .ico-svg{width:16px; height:16px}
+  .tab-collapse{flex:0 0 30px; font-size:13px}
+}
+/* 아주 좁은 폰(360px 이하)에서도 라벨이 잘리지 않게 한 단계 더 */
+@media (max-width:380px){
+  .tabbar button.tab{font-size:8.2px; letter-spacing:-.3px}
+  .tabbar button.tab[data-tool=speed]{letter-spacing:-.45px}
+}
 /* 행사 템플릿 카드 */
 .tpl-strip{display:flex; gap:8px; overflow-x:auto; max-width:100%; padding:2px 0 4px; scrollbar-width:none}
 .tpl-strip::-webkit-scrollbar{display:none}
@@ -979,6 +997,7 @@ canvas#preview{-webkit-touch-callout:none}
       <button class="tab" data-tool="template"><span class="ico" data-ico="gift"></span>템플릿</button>
       <button class="tab" data-tool="ratio"><span class="ico" data-ico="frame"></span>비율</button>
       <button class="tab-collapse" id="btnCollapse" title="도구 접기">⌄</button>
+      <button class="tab tab-del" data-tool="delete" title="지금 고른 사진·클립·자막·음악 삭제" aria-label="지금 고른 항목 삭제 — 사진·클립·자막·음악"><span class="ico" data-ico="trash"></span>삭제</button>
     </nav>
   </section>
 </main>
@@ -2905,6 +2924,44 @@ function deleteSelected(msg) {
   renderAll();
   toast(msg || '삭제했어요');
 }
+
+/* ---------------- v11: 하단 맨 끝 ‘삭제’ 탭 ----------------
+   지금 고른 것(사진·영상 클립·첫 소개화면·엔딩·자막·이미지·스티커·모자이크·음악)을
+   한 번에 지우고, 아무것도 안 골랐으면 무엇을 먼저 눌러야 하는지 알려 준다. */
+function selectedTargetInfo() {
+  const s = state.selected;
+  if (!s) return null;
+  if (s.type === 'clip') {
+    const c = clipById(s.id);
+    if (!c) return null;
+    const label = c.intro ? '첫 소개화면' : c.ending ? '엔딩 인사' : (c.name || (c.kind === 'image' ? '사진' : '영상'));
+    return { s, label };
+  }
+  if (s.type === 'overlay') {
+    const o = overlayById(s.id);
+    if (!o) return null;
+    const label = o.kind === 'mosaic' ? (o.mode === 'blur' ? '블러' : '모자이크') : ovLabel(o);
+    return { s, label };
+  }
+  if (s.type === 'audio') {
+    const a = audioById(s.id);
+    if (!a) return null;
+    return { s, label: a.name || '음악' };
+  }
+  return null;
+}
+function deleteTabHit() {
+  const hit = selectedTargetInfo();
+  if (!hit) { toast('삭제할 사진이나 클립을 먼저 눌러 주세요', 'warn'); return false; }
+  const short = hit.label.length > 14 ? hit.label.slice(0, 14) + '…' : hit.label;
+  deleteSelected('🗑 ' + short + ' 삭제했어요 (실행 취소로 돌릴 수 있어요)');
+  return true;
+}
+/* 고른 것이 있으면 맨 끝 삭제 탭을 붉게 켜서 ‘지금 누르면 지워진다’를 보여 준다 */
+function syncDelTab() {
+  const b = document.querySelector('#tabbar .tab[data-tool=delete]');
+  if (b) b.classList.toggle('armed', !!selectedTargetInfo());
+}
 function moveSelectedClip(dir) {
   const c = selectedClip();
   if (!c) { toast('순서를 바꿀 클립을 먼저 선택해 주세요.', 'warn'); return; }
@@ -3081,7 +3138,7 @@ function renderTimeline() {
     // 선택한 클립: 양옆 길이 조절 손잡이(사진은 오른쪽만) + 우측 상단 🗑 삭제
     const handles = sel ? `${c.kind === 'image' ? '' : `<span class="clip-handle left" data-handle="left" data-id="${c.id}" title="앞부분 잘라내기(트림)"></span>`}<span class="clip-handle right" data-handle="right" data-id="${c.id}" title="뒷부분 길이 조절(트림)"></span>` : '';
     const delBtn = sel && w >= 46 ? `<button class="clip-del" data-del="${c.id}" title="이 클립 삭제">🗑</button>` : '';
-    return `<div class="clip-block${sel ? ' sel' : ''}${dragClipId === c.id ? ' dragging' : ''}" data-id="${c.id}" title="${esc(c.name)} · ${fmtTime(c.duration)} — 끌어서 순서 바꾸기"
+    return `<div class="clip-block${sel ? ' sel' : ''}${dragClipId === c.id ? ' dragging' : ''}" data-id="${c.id}" title="${esc(c.name)} · ${fmtTime(c.duration)} — 끌어서 순서 바꾸기, 꾹 누르면 삭제"
         style="left:${left.toFixed(1)}px;width:${Math.max(14, w - 2).toFixed(1)}px">
         ${thumb ? `<div class="clip-thumb" style="background-image:url('${thumb}')"></div>` : ''}
         <div class="clip-shade"></div>
@@ -3134,6 +3191,7 @@ function renderTimeline() {
   const ph = $('#playhead');
   ph.style.transform = `translateX(${state.time * zoom}px)`;
   ph.style.height = '100%';
+  syncDelTab();   // v11: 고른 것이 있으면 맨 끝 삭제 탭을 붉게 켬
 }
 
 /* ---------------- compact control helpers ---------------- */
@@ -4721,6 +4779,7 @@ $('#tabbar').addEventListener('click', e => {
   if (collapse) { toggleTools(); return; }
   const b = e.target.closest('.tab');
   if (!b) return;
+  if (b.dataset.tool === 'delete') { deleteTabHit(); return; }   // v11: 맨 끝 삭제 탭 — 패널을 열지 않고 바로 지운다
   const panel = toolsPanel;
   const collapsed = panel.classList.contains('collapsed');
   if (tab === b.dataset.tool && !collapsed) { toggleTools(true); return; }
@@ -4783,9 +4842,9 @@ window.addEventListener('resize', () => { lastLayoutTab = null; applyTabLayout(t
 /* ---------------- timeline interactions ---------------- */
 let tlDrag = null;
 
-/* ---------------- 음악 블록 꼭 누르면 삭제 (롱프레스) ----------------
-   - 타임라인 음악 블록을 450ms 이상 가만히 누르면 그 음악을 지운다(실행 취소 가능).
-   - 손가락이 8px 이상 움직이면 스크롤·드래그로 보고 취소한다 → 이동·트림과 충돌하지 않는다. */
+/* ---------------- 블록 꾹 누르면 삭제 (롱프레스) ----------------
+   - 타임라인의 음악 블록·사진/영상 클립을 450ms 이상 가만히 누르면 그 항목을 지운다(실행 취소 가능).
+   - 손가락이 8px 이상 움직이면 스크롤·드래그로 보고 취소한다 → 이동·트림·클립 순서 바꾸기와 충돌하지 않는다. */
 const LP_MS = 450, LP_TOL = 8;
 let lpPress = null;
 function lpCancel() {
@@ -4794,7 +4853,7 @@ function lpCancel() {
   if (lpPress.ring) { lpPress.ring.remove(); lpPress.ring = null; }
   lpPress = null;
 }
-function lpStart(id, rect, x, y) {
+function lpStart(type, id, rect, x, y) {
   lpCancel();
   const ring = document.createElement('div');
   ring.className = 'lp-ring';
@@ -4803,7 +4862,7 @@ function lpStart(id, rect, x, y) {
   ring.style.width = rect.width + 'px';
   ring.style.height = rect.height + 'px';
   document.body.appendChild(ring);
-  const st = { id, ring, x, y, timer: 0 };
+  const st = { type, id, ring, x, y, timer: 0 };
   st.timer = setTimeout(() => lpFire(st), LP_MS);
   lpPress = st;
 }
@@ -4811,6 +4870,22 @@ function lpFire(st) {
   clearTimeout(st.timer);
   if (st.ring) { st.ring.remove(); st.ring = null; }
   if (lpPress === st) lpPress = null;
+  if (st.type === 'clip') {
+    const c = clipById(st.id);
+    if (!c) return;
+    const label = c.intro ? '첫 소개화면' : c.ending ? '엔딩 인사' : (c.kind === 'image' ? '사진' : '영상');
+    tlDrag = null;                 // 진행 중이던 드래그·트림 기록은 버린다(중복 히스토리 방지)
+    pushHistory();                 // 실행 취소로 되돌릴 수 있게
+    if (c._el) { try { c._el.pause(); } catch (e) { } c._el.remove(); c._el = null; }
+    state.clips = state.clips.filter(x => x.id !== st.id);
+    if (state.selected && state.selected.type === 'clip' && state.selected.id === st.id) state.selected = null;
+    layout();
+    state.time = clamp(state.time, 0, totalDuration());
+    renderAll();
+    try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) { }
+    toast('🗑 ' + label + ' 삭제했어요 (실행 취소로 되돌릴 수 있어요)', 'ok');
+    return;
+  }
   const a = audioById(st.id);
   if (!a) return;
   tlDrag = null;                 // 진행 중이던 드래그·트림 기록은 버린다(중복 히스토리 방지)
@@ -4981,12 +5056,14 @@ tlContent.addEventListener('pointerdown', e => {
     const auRect = auEl.getBoundingClientRect();
     selectAudio(a.id, true);   // 고르기만 — 탭 전환은 톡 치고 뗄 때
     tlDrag = { kind: 'audio', a, x, start: a.start, moved: false, snap: snapshot() };
-    lpStart(a.id, auRect, e.clientX, e.clientY);   // 450ms 꼭 누르면 삭제
+    lpStart('audio', a.id, auRect, e.clientX, e.clientY);   // 450ms 꼭 누르면 삭제
     e.preventDefault();
   } else if (clEl) {
     const c = clipById(clEl.dataset.id);
     if (c) {
+      const clRect = clEl.getBoundingClientRect();   // 고르면 타임라인이 다시 그려지므로 먼저 잰다
       selectClip(c.id);
+      lpStart('clip', c.id, clRect, e.clientX, e.clientY);   // 450ms 꾹 누르면 사진·클립 삭제
       /* 클립을 끌면 순서 바꾸기 — 손가락이 12px 이상 움직였을 때만 시작해서 ‘톡 치기'와 구분한다 */
       tlDrag = { kind: 'clip', c, x, moved: false, snap: snapshot() };
       e.preventDefault();
@@ -7387,7 +7464,8 @@ const ICO = {
   badge: '<circle cx="10" cy="9" r="4.6"/><path d="M4 17.6c0-1.9 2.7-3 6-3s6 1.1 6 3"/><path d="M8.2 9.1l1.3 1.3 2.4-2.4"/>',
   musicfit: '<circle cx="6" cy="14.4" r="2"/><path d="M8 14.4V6.2l6-1.4v9.6"/><path d="M14 4.8h4M16 2.8l2 2-2 2"/>',
   spark: '<path d="M10 2.8 11.6 8l5.2 1.6-5.2 1.6L10 16.4 8.4 11.2 3.2 9.6 8.4 8z"/>',
-  gauge: '<path d="M3.1 12.6a6.9 6.9 0 0 1 13.8 0"/><path d="M10 12.6 13.4 8.4"/><circle cx="10" cy="12.6" r="1.1"/><path d="M4.9 17.3h10.2"/>'
+  gauge: '<path d="M3.1 12.6a6.9 6.9 0 0 1 13.8 0"/><path d="M10 12.6 13.4 8.4"/><circle cx="10" cy="12.6" r="1.1"/><path d="M4.9 17.3h10.2"/>',
+  trash: '<path d="M3.8 5.9h12.4M7.9 5.9V4.1h4.2v1.8"/><path d="M5.6 5.9l.8 10.2h7.2l.8-10.2"/><path d="M8.5 8.9v4.5M11.5 8.9v4.5"/>'
 };
 function ico(name, extra) {
   const d = ICO[name] || '';
@@ -7700,6 +7778,7 @@ const HELP_TIPS = [
   '아래 <b>속도·길이</b> 탭에서 버튼만 눌러도 배속과 길이가 바뀜요 — 드래그가 어려울 때 쓰세요.',
   '클립·자막·음악 블록의 <b>양끝 손잡이</b>를 끌면 길이가 늘어나고 줄어들어요.',
   '타임라인 음악 블록을 <b>꾹 누르면</b> 바로 삭제돼요 (실행 취소로 되돌릴 수 있어요).',
+  '아래 <b>맨 끝 🗑 삭제</b> 탭은 지금 고른 사진·클립·자막·음악을 바로 지우고, 사진·클립은 타임라인에서 <b>꾹 눌러도</b> 지워져요.',
   '편집을 마치고 <b>✓ 확인</b>을 누르면 선택이 풀리고 타임라인이 크게 펴져요.',
   '클립을 <b>끌어서 옆으로</b> 옮기면 장면 순서가 바뀌어요.',
   '앱을 닫아도 <b>자동 임시저장</b>돼서 첫 화면의 <b>이어서 편집하기</b>로 돌아올 수 있어요.'
@@ -7869,6 +7948,13 @@ function boot() {
       lenTo: padLenTo, lenBy: padLenBy, startTo: padStartTo, startBy: padStartBy,
       setSpeed: padSetSpeed, speedAll: padSpeedAll, photoAll: padPhotoAll,
       bulkSpeed: () => padSpeedEff(), setBulkSpeed: v => { padSpeedPick = v; renderRight(); }
+    },
+    /* ---- v11: 하단 맨 끝 삭제 탭 · 꾹 눌러 삭제 ---- */
+    v11: {
+      tab: () => { const b = document.querySelector('#tabbar .tab[data-tool=delete]'); if (b) b.click(); },
+      armed: () => { const b = document.querySelector('#tabbar .tab[data-tool=delete]'); return !!b && b.classList.contains('armed'); },
+      target: selectedTargetInfo, del: deleteTabHit, sync: syncDelTab,
+      lp: { ms: LP_MS, tol: LP_TOL, active: () => !!lpPress, cancel: lpCancel }
     }
   };
 }
