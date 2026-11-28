@@ -610,6 +610,22 @@ label.chip.chk.mute-track.on{border-color:#ff8fa3; background:#3a1720; color:#ff
 .clip-handle.left{left:0; border-radius:5px 0 0 5px}
 .clip-handle.right{right:0; border-radius:0 5px 5px 0}
 .clip-handle:active{background:linear-gradient(180deg,#a98dff,#7ff0d2)}
+/* ---------- v11: 사진 클립 길이 조절 손잡이 — 손가락으로 잡기 쉽게 크고 노랗게 ----------
+   사진(첫 소개화면·엔딩 포함)을 고르면 오른쪽 끝에 26px 짜리 노란 손잡이가 붙고,
+   끌면 사진 길이가 0.5~60초 안에서 늘어나거나 줄어든다. */
+.clip-handle.photo{
+  width:26px; gap:3px; border-radius:0 5px 5px 0;
+  background:linear-gradient(180deg,#ffd977,#f2b32a);
+  box-shadow:inset 0 0 0 1px rgba(70,45,0,.35), 0 0 12px rgba(255,209,102,.5);
+}
+.clip-handle.photo:before{content:""; width:3px; height:17px; border-radius:2px; background:rgba(52,34,0,.55); box-shadow:none}
+.clip-handle.photo:after{
+  content:""; width:8px; height:8px; background:none; border-radius:0; box-shadow:none;
+  border-top:2.4px solid rgba(52,34,0,.62); border-right:2.4px solid rgba(52,34,0,.62); transform:rotate(45deg);
+}
+.clip-handle.photo:active{background:linear-gradient(180deg,#ffe9b3,#ffc94d)}
+.clip-block.photo .clip-del{right:32px}
+.clip-block.photo.sel .clip-name{right:62px}
 /* ---------- 자막·음악 블록 길이 조절(트리밍) 손잡이 ----------
    블록을 톡 쳐서 고르면 양옆에 노란 손잡이가 나타나고, 손가락으로 끌면
    자막은 시작·끝 시간, 음악은 시작점·길이가 바뀐다. 블록 본체 드래그(옮기기)·
@@ -2381,7 +2397,7 @@ function addClipFromAsset(asset) {
     speed: 1,
     volume: 1,
     muted: false,
-    duration: isImage ? clamp(photoDefault || 3, 0.2, 60) : Math.max(0.3, asset.duration || 3)
+    duration: isImage ? clamp(photoDefault || 3, 0.5, 60) : Math.max(0.3, asset.duration || 3)
   };
   state.clips.push(clip);
   layout();
@@ -2991,7 +3007,9 @@ function clipMaxDuration(c) {
 }
 function setClipDuration(c, d) {
   if (!c) return;
-  c.duration = clamp(Math.round((Number(d) || 0) * 100) / 100, 0.2, clipMaxDuration(c));
+  /* 사진은 0.5초보다 짧으면 알아보기 어려워 0.5~60초, 영상은 0.2초부터 */
+  const min = c.kind === 'image' ? 0.5 : 0.2;
+  c.duration = clamp(Math.round((Number(d) || 0) * 100) / 100, min, clipMaxDuration(c));
 }
 
 /* ---------------- sample project ---------------- */
@@ -3133,12 +3151,14 @@ function renderTimeline() {
     const asset = c.assetId ? assets.get(c.assetId) : null;
     const thumb = c.kind === 'demo' ? DEMO_THUMB : (asset && asset.thumb ? asset.thumb : '');
     const sel = state.selected && state.selected.type === 'clip' && state.selected.id === c.id;
+    const isPhoto = c.kind === 'image';
     const spd = c.speed && Math.abs(c.speed - 1) > 0.001 ? `<span class="badge speed">${c.speed}×</span>` : '';
     const kbB = c.kb && c.kb !== 'none' ? `<span class="badge speed">${c.kb === 'in' ? '줌인' : '줌아웃'}</span>` : '';
     // 선택한 클립: 양옆 길이 조절 손잡이(사진은 오른쪽만) + 우측 상단 🗑 삭제
-    const handles = sel ? `${c.kind === 'image' ? '' : `<span class="clip-handle left" data-handle="left" data-id="${c.id}" title="앞부분 잘라내기(트림)"></span>`}<span class="clip-handle right" data-handle="right" data-id="${c.id}" title="뒷부분 길이 조절(트림)"></span>` : '';
+    // 사진은 손가락으로 잡기 쉬운 큰 노란 손잡이를 오른쪽 끝에 붙인다(0.5~60초).
+    const handles = sel ? `${isPhoto ? '' : `<span class="clip-handle left" data-handle="left" data-id="${c.id}" title="앞부분 잘라내기(트림)"></span>`}<span class="clip-handle right${isPhoto ? ' photo' : ''}" data-handle="right" data-id="${c.id}" title="${isPhoto ? '끌어서 사진 길이 조절 (0.5~60초)' : '뒷부분 길이 조절(트림)'}"></span>` : '';
     const delBtn = sel && w >= 46 ? `<button class="clip-del" data-del="${c.id}" title="이 클립 삭제">🗑</button>` : '';
-    return `<div class="clip-block${sel ? ' sel' : ''}${dragClipId === c.id ? ' dragging' : ''}" data-id="${c.id}" title="${esc(c.name)} · ${fmtTime(c.duration)} — 끌어서 순서 바꾸기, 꾹 누르면 삭제"
+    return `<div class="clip-block${isPhoto ? ' photo' : ''}${sel ? ' sel' : ''}${dragClipId === c.id ? ' dragging' : ''}" data-id="${c.id}" title="${esc(c.name)} · ${fmtTime(c.duration)} — 끌어서 순서 바꾸기, 꾹 누르면 삭제"
         style="left:${left.toFixed(1)}px;width:${Math.max(14, w - 2).toFixed(1)}px">
         ${thumb ? `<div class="clip-thumb" style="background-image:url('${thumb}')"></div>` : ''}
         <div class="clip-shade"></div>
@@ -3268,7 +3288,7 @@ function padTarget() {
       name: c.name || '클립', canSpeed: !img,
       len: () => c.duration,
       setLen: d => setClipDuration(c, d),
-      minLen: 0.2,
+      minLen: img ? 0.5 : 0.2,
       maxLen: () => clipMaxDuration(c),
       maxStart: () => Math.max(0, clipSourceLength(c) - c.duration * (c.speed || 1)),
       hasStart: !img,
@@ -4903,7 +4923,10 @@ function lpFire(st) {
 function showTlTip(e, c) {
   const tip = $('#tlTip');
   if (!tip) return;
-  tip.textContent = (c.kind === 'image' ? '🖼 사진 ' : '🎞 영상 ') + c.duration.toFixed(1) + '초';
+  /* 사진은 늘일 수 있는 범위를 함께 보여 준다(0.5초~60초) */
+  tip.textContent = c.kind === 'image'
+    ? '🖼 사진 ' + c.duration.toFixed(1) + '초 · 0.5초~60초'
+    : '🎞 영상 ' + c.duration.toFixed(1) + '초';
   tip.hidden = false;
   tip.style.left = Math.max(4, Math.min(window.innerWidth - 100, e.clientX + 14)) + 'px';
   tip.style.top = Math.max(6, e.clientY - 38) + 'px';
@@ -5188,6 +5211,7 @@ window.addEventListener('pointerup', e => {
   if ((dragKind === 'audio' || dragKind === 'autrim') && state.playing) { stopAllMusic(); syncMusic(state.time); }   // 음악 블록을 옮겼거나 길이를 바꿨으면 새 구간으로
   renderTimeline();
   if (dragMoved && dragKind === 'ovtrim' && dragOv) toast(trimTipText('ov', dragOv), 'ok');
+  if (dragMoved && dragKind === 'trim' && dragClip && dragClip.kind === 'image') toast('🖼 사진 길이 ' + dragClip.duration.toFixed(1) + '초 (0.5~60초)', 'ok');
   if (dragMoved && dragKind === 'autrim' && dragAu) toast(trimTipText('audio', dragAu), 'ok');
   if (dragMoved && dragKind === 'clip' && dragClip && state.clips.length > 1) toast('클립 순서를 ' + (state.clips.indexOf(dragClip) + 1) + '번째로 바꿨어요', 'ok');
   markDirty();
@@ -7779,6 +7803,7 @@ const HELP_TIPS = [
   '클립·자막·음악 블록의 <b>양끝 손잡이</b>를 끌면 길이가 늘어나고 줄어들어요.',
   '타임라인 음악 블록을 <b>꾹 누르면</b> 바로 삭제돼요 (실행 취소로 되돌릴 수 있어요).',
   '아래 <b>맨 끝 🗑 삭제</b> 탭은 지금 고른 사진·클립·자막·음악을 바로 지우고, 사진·클립은 타임라인에서 <b>꾹 눌러도</b> 지워져요.',
+  '사진 클립을 톡 눌러 고르면 오른쪽에 <b>노란 손잡이</b>가 생겨요. 끌면 사진 길이가 <b>0.5초~60초</b> 안에서 늘어나거나 줄어들어요.',
   '편집을 마치고 <b>✓ 확인</b>을 누르면 선택이 풀리고 타임라인이 크게 펴져요.',
   '클립을 <b>끌어서 옆으로</b> 옮기면 장면 순서가 바뀌어요.',
   '앱을 닫아도 <b>자동 임시저장</b>돼서 첫 화면의 <b>이어서 편집하기</b>로 돌아올 수 있어요.'
