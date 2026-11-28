@@ -2,7 +2,7 @@
    전략: 설치 시 앱 껍데기 선캐시 → 요청 시 캐시 우선 + 백그라운드 갱신(stale-while-revalidate)
    내비게이션 요청이 오프라인이면 index.html로 폴백. */
 // 캐시 버전을 올리면 아이폰 홈 화면 앱이 다음 실행 때 새 버전을 즉시 받는다.
-const CACHE = 'chogok-video-v10';
+const CACHE = 'chogok-video-v11';
 const ASSETS = [
   './',
   './index.html',
