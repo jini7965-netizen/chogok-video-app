@@ -6238,8 +6238,8 @@ async function _applyTemplate(key, btn) {
     });
   }
   layout();
-  /* ① 이전에 넣은 템플릿 꾸미기는 걷어낸다 — 시즌 템플릿은 다른 시즌 것까지 모두 교체 */
-  state.overlays = state.overlays.filter(o => (tpl.season ? !o.tpl : o.tpl !== key));
+  /* ① 이전에 넣은 템플릿 꾸미기는 걷어낸다 — 다른 템플릿 것으로 갈아끼우기 */
+  state.overlays = state.overlays.filter(o => !o.tpl);
   /* ② 시즌·명절 템플릿은 맨 앞 소개화면부터 — 직접 만든 소개화면은 그대로 두고,
         예전 템플릿이 만든 소개화면은 새 그림으로 갈아끼운다 */
   if (tpl.intro) {
